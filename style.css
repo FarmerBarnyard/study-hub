@@ -48,8 +48,13 @@ section.cert-section{margin-bottom:36px;}
   padding:2px 8px;border-radius:3px;white-space:nowrap;
 }
 .cert-status.in-progress{background:var(--blue-bg);color:var(--blue);}
-.cert-status.not-started{background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border);}
+/* Not #6b7885 (--text-dim) -- that only clears 3.76:1 against --surface-2 at
+   this badge's ~10.9px bold size, short of WCAG AA's 4.5:1 for normal text.
+   #7d8a97 clears ~4.8:1 on the same background. */
+.cert-status.not-started{background:var(--surface-2);color:#7d8a97;border:1px solid var(--border);}
 .cert-status.done{background:rgba(76,195,138,.12);color:var(--up);}
+
+.cert-fullname{color:var(--text-dim);font-size:.82rem;margin:2px 0 0;}
 
 .cert-links{margin:8px 0 0;font-size:.82rem;display:flex;gap:14px;flex-wrap:wrap;}
 .cert-links a{display:inline-flex;align-items:center;gap:4px;}
@@ -71,7 +76,10 @@ section.cert-section{margin-bottom:36px;}
   list-style:none;display:flex;align-items:center;gap:6px;
 }
 .revision-notes summary::-webkit-details-marker{display:none;}
-.revision-notes summary::before{content:"▸";display:inline-block;transition:transform .15s ease;}
+/* content:"▸" / "" -- the empty alt after the slash keeps this decorative
+   glyph out of the accessibility tree (Chrome/Safari both expose generated
+   content by default), so it isn't announced ahead of "Revision notes". */
+.revision-notes summary::before{content:"▸" / "";display:inline-block;transition:transform .15s ease;}
 .revision-notes[open] summary::before{transform:rotate(90deg);}
 .revision-notes summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
 

@@ -4,20 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'self'; form-action 'none';">
-<title>Study</title>
+<title>Study &mdash; Barnyard</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header class="study-header">
-  <p class="wordmark">Study</p>
+  <h1 class="wordmark">Study</h1>
   <p class="tagline">Certifications in progress, and the notes that go with them.</p>
   <a class="back-link" href="https://dashboard.barnyard.site/">&larr; Back to Barnyard</a>
 </header>
 
+<noscript>
+  <p class="cert-empty-note">This page needs JavaScript to load the certification list. You can browse the underlying Notion pages directly instead, or view this repo on <a href="https://github.com/FarmerBarnyard/study-hub">GitHub</a>.</p>
+</noscript>
+
 <main id="main-content">
 
   <p class="generated-note" id="generated-note"></p>
+  <p class="cert-empty-note" id="loading-note">Loading certifications&hellip;</p>
 
   <section class="cert-section" aria-labelledby="ongoing-heading">
     <h2 class="section-heading" id="ongoing-heading">Ongoing</h2>

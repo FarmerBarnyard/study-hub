@@ -12,7 +12,7 @@
   var DATA_URL = "data.json";
   var FETCH_TIMEOUT_MS = 10000;
 
-  function fetchJsonWithTimeout(url) {
+  function fetchWithTimeout(url, parseAs) {
     var controller = new AbortController();
     var timeoutId = setTimeout(function () {
       controller.abort();
@@ -20,7 +20,7 @@
     return fetch(url, { signal: controller.signal, referrerPolicy: "no-referrer" })
       .then(function (r) {
         if (!r.ok) throw new Error("bad response");
-        return r.json();
+        return parseAs === "text" ? r.text() : r.json();
       })
       .finally(function () {
         clearTimeout(timeoutId);
@@ -33,6 +33,21 @@
     return "not-started";
   }
 
+  // Guards against a malformed data.json entry (missing/renamed field from
+  // a future Notion-side edit) rendering the literal string "undefined" --
+  // textContent = undefined stringifies to "undefined" (only null maps to
+  // empty), and an absent notionUrl would otherwise produce a live-looking
+  // href="undefined" link that 404s. Pure/DOM-free so it's unit-testable.
+  function normalizeCert(cert) {
+    cert = cert || {};
+    var name = typeof cert.name === "string" && cert.name ? cert.name : "(untitled certification)";
+    var fullName = typeof cert.fullName === "string" && cert.fullName && cert.fullName !== name ? cert.fullName : null;
+    var status = typeof cert.status === "string" && cert.status ? cert.status : null;
+    var notionUrl = typeof cert.notionUrl === "string" && cert.notionUrl.indexOf("https://") === 0 ? cert.notionUrl : null;
+    var notesUrl = typeof cert.notesUrl === "string" && cert.notesUrl ? cert.notesUrl : null;
+    return { name: name, fullName: fullName, status: status, notionUrl: notionUrl, notesUrl: notesUrl };
+  }
+
   // Lazily fetches and injects a cert's revision-notes HTML fragment the
   // first time its <details> is expanded, rather than loading every cert's
   // notes upfront on page load. The fragment is a build-time-generated
@@ -40,6 +55,10 @@
   // input -- so innerHTML here is a deliberate exception to the
   // textContent-only convention barnyard-hub's own JS uses for genuinely
   // untrusted data (calendar events, to-do text, etc.).
+  //
+  // `loaded` resets to false on failure (timeout, 404, network error) so
+  // collapsing and re-expanding the <details> retries, rather than leaving
+  // a permanent error with no way to recover short of a full page reload.
   function wireLazyNotes(details, notesUrl) {
     var body = details.querySelector(".notes-body");
     var loaded = false;
@@ -47,22 +66,20 @@
       if (!details.open || loaded) return;
       loaded = true;
       body.textContent = "Loading…";
-      fetch(notesUrl, { referrerPolicy: "no-referrer" })
-        .then(function (r) {
-          if (!r.ok) throw new Error("bad response");
-          return r.text();
-        })
+      fetchWithTimeout(notesUrl, "text")
         .then(function (html) {
           // Trusted, build-time-generated HTML fragment -- see comment above.
           body.innerHTML = html;
         })
         .catch(function () {
-          body.textContent = "Couldn't load revision notes right now.";
+          loaded = false;
+          body.textContent = "Couldn't load revision notes right now. Collapse and expand to retry.";
         });
     });
   }
 
-  function buildCertCard(cert, isCompleted) {
+  function buildCertCard(rawCert, isCompleted) {
+    var cert = normalizeCert(rawCert);
     var li = document.createElement("li");
     li.className = "cert-card";
 
@@ -83,23 +100,24 @@
 
     li.appendChild(head);
 
-    if (!isCompleted && cert.fullName && cert.fullName !== cert.name) {
+    if (!isCompleted && cert.fullName) {
       var fullNameEl = document.createElement("p");
-      fullNameEl.className = "cert-empty-note";
-      fullNameEl.style.marginTop = "2px";
+      fullNameEl.className = "cert-fullname";
       fullNameEl.textContent = cert.fullName;
       li.appendChild(fullNameEl);
     }
 
-    var links = document.createElement("p");
-    links.className = "cert-links";
-    var notionLink = document.createElement("a");
-    notionLink.href = cert.notionUrl;
-    notionLink.target = "_blank";
-    notionLink.rel = "noopener noreferrer";
-    notionLink.textContent = "View notes in Notion →";
-    links.appendChild(notionLink);
-    li.appendChild(links);
+    if (cert.notionUrl) {
+      var links = document.createElement("p");
+      links.className = "cert-links";
+      var notionLink = document.createElement("a");
+      notionLink.href = cert.notionUrl;
+      notionLink.target = "_blank";
+      notionLink.rel = "noopener noreferrer";
+      notionLink.textContent = "View notes in Notion →";
+      links.appendChild(notionLink);
+      li.appendChild(links);
+    }
 
     if (cert.notesUrl) {
       var details = document.createElement("details");
@@ -125,10 +143,16 @@
     return li;
   }
 
+  function loadingNoteEl() {
+    return document.getElementById("loading-note");
+  }
+
   function render(data) {
     var ongoingList = document.getElementById("ongoing-list");
     var completedList = document.getElementById("completed-list");
     var generatedNote = document.getElementById("generated-note");
+    var loadingNote = loadingNoteEl();
+    if (loadingNote) loadingNote.remove();
 
     if (ongoingList) {
       (data.ongoing || []).forEach(function (cert) {
@@ -140,23 +164,28 @@
         completedList.appendChild(buildCertCard(cert, true));
       });
     }
-    if (generatedNote && data.generated) {
+    if (generatedNote && typeof data.generated === "string" && data.generated) {
       generatedNote.textContent = "Last synced from Notion: " + data.generated;
     }
   }
 
   function renderError() {
+    var loadingNote = loadingNoteEl();
+    if (loadingNote) {
+      loadingNote.textContent = "Couldn't load certification data right now.";
+      return;
+    }
     var main = document.getElementById("main-content");
     if (!main) return;
     var p = document.createElement("p");
     p.className = "cert-empty-note";
     p.textContent = "Couldn't load certification data right now.";
-    main.appendChild(p);
+    main.insertBefore(p, main.firstChild);
   }
 
   if (typeof document !== "undefined") {
     document.addEventListener("DOMContentLoaded", function () {
-      fetchJsonWithTimeout(DATA_URL).then(render).catch(renderError);
+      fetchWithTimeout(DATA_URL, "json").then(render).catch(renderError);
     });
   }
 
@@ -166,7 +195,8 @@
   // since `module` is undefined there).
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {
-      statusClass: statusClass
+      statusClass: statusClass,
+      normalizeCert: normalizeCert
     };
   }
 })();
