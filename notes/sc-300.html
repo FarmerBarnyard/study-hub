@@ -1,0 +1,168 @@
+<h3>Core Definitions</h3>
+<ul>
+<li><strong>Identity Administration</strong> &ndash; managing identity objects across their lifecycle.</li>
+<li><strong>Centralized Identity Management</strong> &ndash; single tool storing/managing credentials for AuthN/AuthZ (on-prem or cloud), run by an identity authority.</li>
+<li><strong>Decentralized Identity</strong> &ndash; people/orgs/things interact transparently and securely via an identity trust fabric.</li>
+<li><strong>Identity</strong> &ndash; an object that can be authenticated. <strong>Account</strong> &ndash; an identity with associated data.</li>
+<li><strong>Microsoft Entra Account</strong> &ndash; identity created via Entra ID or another MS cloud service (e.g., M365).</li>
+<li><strong>Tenant</strong> &ndash; a dedicated, trusted instance of Entra ID, auto-created when an org signs up for a MS cloud subscription.</li>
+<li><strong>Administrative Unit</strong> &ndash; a partitioned piece of a tenant used to create an admin boundary.</li>
+<li><strong>PHS (Password Hash Synchronization)</strong> &ndash; simplest way to enable on-prem auth in Entra ID; no extra infrastructure needed.</li>
+<li><strong>Connector Space (CS)</strong> &ndash; staging area per connected directory before the provisioning engine processes objects (Entra ID has its own CS; so does each forest).</li>
+<li><strong>Metaverse (MV)</strong> &ndash; single central store where synced objects are created per sync rules.</li>
+<li><strong>Sync Rules</strong> &ndash; determine which objects get created/connected in the MV.</li>
+<li><strong>Run Profiles</strong> &ndash; bundle the steps for copying objects/attributes between staging areas and connected directories.</li>
+</ul>
+
+<h3>Identity Landscape &amp; Zero Trust</h3>
+<p>Five-layer model: <strong>Zero Trust &rarr; Identity &rarr; Actions &rarr; Usage &rarr; Maintain</strong>.</p>
+<ul>
+<li>Zero Trust principles: <strong>Verify Explicitly, Use Least Privilege, Assume Breach</strong>.</li>
+<li>Identity sources: B2B, B2C, Verifiable Credentials, Decentralized Providers.</li>
+<li>Actions: Authenticate (AuthN), Authorize (AuthZ), Administer, Audit.</li>
+</ul>
+<p><strong>Verify Explicitly</strong> &ndash; validate: user ID/location, device health, service/workload context, data classification, anomalies.<br>
+<strong>Least Privilege</strong> &ndash; enforced via: Just-in-Time (JIT), Just-Enough-Access (JEA), risk-based adaptive policies, data protection against out-of-band vectors.<br>
+<strong>Assume Breach</strong> &ndash; segment access by network/user/device/app; encrypt sessions end-to-end; use analytics for detection/posture/defense.</p>
+<p><strong>Identity as a Control Plane</strong> &ndash; directs access to resources based on specific criteria (analogous to a network control plane).</p>
+
+<h3>Authentication, Authorization, Tokens &amp; Claims</h3>
+<p>IdP components: repository of identities, authentication system, security protocols, a trusted party.<br>
+<strong>Protocols</strong>: OpenID Connect (OIDC) &ndash; built on OAuth2, standardized message flows for identity. SAML &ndash; open standard for exchanging AuthN/AuthZ data between IdP and service provider.</p>
+<p><strong>Security Tokens</strong>:</p>
+<ul>
+<li><strong>Access Token</strong> &ndash; issued by auth server in OAuth2 flow; carries user + resource info; used to access APIs.</li>
+<li><strong>Refresh Token</strong> &ndash; issued alongside access token since access tokens are short-lived.</li>
+<li><strong>ID Token</strong> &ndash; sent to client as part of OIDC flow.</li>
+<li><strong>JWT</strong> &ndash; open standard (RFC 7519) for compact, self-contained JSON-based transmission of claims.</li>
+</ul>
+<p>Claims concepts: <strong>Claim</strong> (a data value pair in a token), <strong>Assertion</strong> (a package/token sharing identity/security info across domains), <strong>Attribute</strong> (a value pair within a token), <strong>Augmentation</strong> (adding extra claims to a user token for more detail).</p>
+<p><strong>Common types of Authorization</strong>:</p>
+<ul>
+<li>Access Control Lists (ACLs) &ndash; explicit allow/deny list for entities.</li>
+<li>Role-Based Access Control (RBAC) &ndash; most common authorization approach.</li>
+<li>Attribute-Based Access Control (ABAC) &ndash; rules applied to entity/resource/environment attributes.</li>
+<li>Policy-Based Access Control &ndash; combines business role with policy to determine access.</li>
+</ul>
+
+<h3>Licensing</h3>
+<ul>
+<li><strong>Entra ID P1/P2</strong> &ndash; unlocks premium features. <strong>P2 required for PIM</strong>; any user who assigns/manages PIM assignments needs a license, but a user simply holding a privileged role does not.</li>
+<li><strong>M365/Office 365/Windows licenses</strong> &ndash; one per user needing access to those products.</li>
+<li><strong>Monthly Active User (MAU) license</strong> &ndash; used with Entra External Identities; billed via a monthly report of external users who logged in.</li>
+</ul>
+
+<h3>Lifecycle Management</h3>
+<p>Foundation of Identity Governance. Typical process:</p>
+<ul>
+<li>Identify existing authoritative systems of record (e.g., HR system).</li>
+<li>Compare the system of record against directories/databases used by apps; resolve inconsistencies.</li>
+<li>Determine processes to supply authoritative info for visitors.</li>
+</ul>
+<p>Monitoring services: Azure Monitor, Application Insights, Service Health, Resource Health, Resource Manager, Azure Policy.</p>
+
+<h3>Entra ID Roles &amp; Tenant Configuration</h3>
+<ul>
+<li><strong>Member users</strong> can: register applications, manage their own profile photo/mobile number, change their own password, invite B2B guests.</li>
+<li><strong>Guest users</strong> have restricted permissions: manage own profile, retrieve limited info on other users/groups/apps, cannot read all directory info.</li>
+</ul>
+
+<h3>External Collaboration (B2B)</h3>
+<ul>
+<li><strong>Collaboration</strong> &ndash; external users sign in with their preferred identity; represented as guest users in your directory.</li>
+<li><strong>Direct Connect</strong> &ndash; mutual two-way trust with another Entra org for seamless collaboration (currently supports Teams shared channels).</li>
+</ul>
+<p><strong>Invitation Redemption Flow</strong>:</p>
+<ul>
+<li>User-based discovery checks whether the user already exists in the tenant (if UPN matches both an existing account and a personal MSA, user is prompted to choose).</li>
+<li>If SAML/WS-Fed federation is enabled, Entra ID checks the domain suffix and redirects to the pre-configured IdP.</li>
+<li>If Google federation is enabled, checks for gmail.com/googlemail.com suffix and redirects to Google.</li>
+<li>If the user has an existing personal MSA, they sign in with it.</li>
+<li>Once home directory is identified, user is sent to the corresponding IdP.</li>
+<li>If no home directory is found and One-Time Passcode (OTP) is enabled, a passcode is emailed; if OTP is disabled, the user is prompted to create a consumer MSA.</li>
+<li>After IdP authentication, user is redirected to Entra ID to complete consent.</li>
+</ul>
+<p><strong>External Identities &ndash; Primary Scenario</strong>: collaboration via MS or custom apps; supports any work/school/any email address as IdP; users managed in same directory as employees but annotated as guests; SSO to all Entra ID supported; security/compliance managed by the host org; host branding used.</p>
+<p><strong>UserType</strong>: <strong>Member</strong> &ndash; employee/payroll user of the host org. <strong>Guest</strong> &ndash; not considered internal to the company.</p>
+<p><strong>Microsoft Entra Verified ID</strong> &ndash; decentralized identity solution to issue/verify credentials. Requirements: Azure tenant + subscription, Entra ID Premium license, Global Administrator account, Azure Key Vault instance.</p>
+
+<h3>Configuring External IdPs / Federation</h3>
+<ul>
+<li>SAML/WS-Fed IdP federation (formerly &ldquo;Direct Federation&rdquo;) works with any IdP supporting SAML 2.0.</li>
+<li>Setting up federation does <strong>not</strong> retroactively change the auth method for guests who already redeemed invitations &mdash; they keep using whatever method they redeemed with, even if federation is later added, changed, or the partner org migrates to Entra ID.</li>
+<li>Deleting federation with a partner&rsquo;s IdP locks out guests currently using it.</li>
+<li>The target domain for direct federation <strong>must not be DNS-verified</strong> on Entra ID.</li>
+</ul>
+
+<h3>Hybrid Identity (Entra Connect)</h3>
+<p><strong>Microsoft Entra Connect</strong> bridges on-prem AD with cloud Entra ID:</p>
+<ul>
+<li><strong>Synchronization</strong> &ndash; creates users/groups/objects; matches identity info (incl. password hashes) to cloud.</li>
+<li><strong>Password Hash Synchronization</strong> &ndash; syncs hash of on-prem AD password.</li>
+<li><strong>Pass-through Authentication (PTA)</strong> &ndash; same password on-prem and cloud, without federation infrastructure.</li>
+<li><strong>Federation integration</strong> &ndash; optional, uses on-prem AD FS for hybrid.</li>
+<li><strong>Health Monitoring</strong> &ndash; via Entra Connect Health.</li>
+</ul>
+<p><strong>Authentication method comparison</strong>:</p>
+<ul>
+<li><strong>PHS</strong>: least effort/infra; runs sync <strong>every 2 minutes</strong>; pair with seamless SSO to reduce prompts; supports leaked-credential reporting via Identity Protection; highly available cloud service; does not immediately enforce on-prem account state changes; good for HA/DR, on-prem outage survival, Identity Protection.</li>
+<li><strong>PTA</strong>: requires one+ lightweight agents on existing servers with access to on-prem AD DS (incl. DCs); supports seamless SSO; enforces on-prem account policy at sign-in time; recommend 2 extra PTA agents for HA; PHS can serve as backup auth if agents can&rsquo;t validate credentials during major on-prem failure.</li>
+<li><strong>Federated Authentication</strong>: relies on external trusted system; needed for smartcard/cert auth, on-prem/third-party MFA requiring a federated IdP, third-party auth solutions, or sign-in requiring sAMAccountName (DOMAIN\username) rather than UPN; needs load-balanced server array; requires significant on-prem investment.</li>
+</ul>
+<p><strong>sourceAnchor attribute</strong> &ndash; immutable identifier linking on-prem and cloud objects:</p>
+<ul>
+<li>Links new/rebuilt sync engine server objects to on-prem objects.</li>
+<li>Enables &ldquo;hard match&rdquo; when moving from cloud-only to synced.</li>
+<li>Combined with UPN to uniquely identify a user in federation claims.</li>
+<li>Rules: &lt;60 characters, no special characters, globally unique, string/integer/binary type, not based on user&rsquo;s name, not case-sensitive, assigned at object creation.</li>
+<li>For a single on-prem forest, use <strong>objectGuid</strong> (alternative: employeeID).</li>
+</ul>
+
+<h3>Microsoft Entra MFA</h3>
+<p>Risk-mitigation features alongside MFA: password complexity/expiration rules, SSPR, Identity Protection (risk-based policies), Password Protection (banned-password list), Smart Lockout, Application Proxy, SSO, Entra Connect.</p>
+<p>MFA factors: <strong>something you know</strong> (password/security question), <strong>something you possess</strong> (mobile app/token device), <strong>something you are</strong> (biometric).</p>
+<p>MFA requires one of: Entra ID P1/P2, M365 Business, Entra ID Free, or M365 standalone.</p>
+
+<h3>Azure Resources / Managed Identities</h3>
+<p><strong>Managed Identity benefits</strong>: no need to manage credentials; can authenticate to any resource supporting Entra authentication.</p>
+
+<h3>User Authentication Methods</h3>
+<p><strong>FIDO2 Security Keys</strong> &ndash; typically USB, also Bluetooth/NFC; unphishable, specification-based, passwordless; open FIDO specification lets users sign in without username/password.</p>
+<p><strong>Windows Hello for Business (WHFB)</strong> &ndash; addresses password weaknesses (hard to remember/reused, server breach exposure, replay attacks, phishing).</p>
+<ul>
+<li>Based on certificate or asymmetric key pair; credentials/token can be bound to the device.</li>
+<li>IdP validates user ID and maps the Hello public key to the account.</li>
+<li>Keys generated in TPM 1.2/2.0 for enterprise, 2.0 for consumer/software.</li>
+<li>2FA = key/cert tied to device; private key never leaves the device when using TPM.</li>
+<li>PIN entry or biometric gesture triggers Windows to cryptographically sign data sent to the IdP.</li>
+</ul>
+<p><strong>Smart Lockout</strong> &ndash; locks account from sign-in for <strong>1 minute after 10 failed attempts</strong>; re-locks after each subsequent failed attempt; <strong>always on</strong> for all Entra ID customers.</p>
+
+<h3>Conditional Access</h3>
+<p><strong>Security Defaults</strong> &ndash; MS-managed baseline settings until an org is ready to manage its own: require MFA registration for all users, require MFA for admins, block legacy auth protocols, require MFA when necessary, protect privileged activities (e.g., Azure portal access).</p>
+<p><strong>CA Policy Benefits</strong>: increased productivity, risk management, compliance/governance, cost management, Zero Trust alignment.</p>
+<p><strong>Access Tokens</strong> (in CA context) &ndash; enable clients to securely call protected APIs for AuthN/AuthZ.</p>
+<p><strong>Common CA Policies</strong>: require MFA, respond to potentially compromised accounts, require managed devices, require approved client apps, block access.</p>
+
+<h3>Identity Protection &amp; Risk Policies</h3>
+<p>Identity Protection lets orgs view account security posture via three tasks: automate detection/remediation of identity-based threats, investigate risks via portal data, export risk detection data to third-party tools.</p>
+<p><strong>Risk policy types</strong>:</p>
+<ul>
+<li><strong>Sign-in risk policy</strong> &ndash; analyzes the sign-in activity itself; probability the sign-in wasn&rsquo;t performed by the legitimate user.</li>
+<li><strong>User risk policy</strong> &ndash; detects probability that a user account is compromised, based on atypical behavior patterns.</li>
+</ul>
+
+<h3>Microsoft Defender for Identity</h3>
+<p>Cloud-based security solution using on-prem AD signals to identify, detect, and investigate advanced threats, compromised identities, and malicious insider activity:</p>
+<ul>
+<li>Monitors users/entities/activities with learning-based analytics.</li>
+<li>Protects identities/credentials stored in AD.</li>
+<li>Identifies/investigates suspicious activity and attacks across the kill chain.</li>
+<li>Provides clear incident timelines for fast triage.</li>
+</ul>
+<p><strong>Components</strong>:</p>
+<ul>
+<li><strong>Defender portal</strong> &ndash; central management/investigation of threats.</li>
+<li><strong>Defender for Identity sensor</strong> &ndash; installed directly on Domain Controllers and AD FS.</li>
+<li><strong>Defender for Identity cloud service</strong> &ndash; runs on Azure infrastructure.</li>
+</ul>

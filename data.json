@@ -1,0 +1,35 @@
+{
+  "generated": "2026-08-23",
+  "source": "Notion – ✅ Knowledgebase database (Status property), Claude PM Workspace",
+  "ongoing": [
+    {
+      "name": "SC-300",
+      "fullName": "SC-300: Microsoft Identity and Access Administrator",
+      "status": "In progress",
+      "notionUrl": "https://app.notion.com/p/2eba25f1dd2d8082b7caedc65d5392bc",
+      "notesUrl": "notes/sc-300.html"
+    },
+    {
+      "name": "AZ-900",
+      "fullName": "AZ-900: Microsoft Azure Fundamentals",
+      "status": "Not started",
+      "notionUrl": "https://app.notion.com/p/255a25f1dd2d808389eac7e1ff8a8357"
+    },
+    {
+      "name": "AZ-104",
+      "fullName": "AZ-104: Microsoft Azure Administrator",
+      "status": "Not started",
+      "notionUrl": "https://app.notion.com/p/255a25f1dd2d80ebba63c8804ff3abde"
+    }
+  ],
+  "completed": [
+    { "name": "Google Cybersecurity", "notionUrl": "https://app.notion.com/p/274a25f1dd2d8085b793cf52ad498915" },
+    { "name": "MS-900", "notionUrl": "https://app.notion.com/p/255a25f1dd2d800a836eef10f5170dcd" },
+    { "name": "Fortigate v7 Operator", "notionUrl": "https://app.notion.com/p/2e4a25f1dd2d805a9a6fd18cf4d0d693" },
+    { "name": "Veeam Technical Specialist: Public Cloud", "notionUrl": "https://app.notion.com/p/267a25f1dd2d8044a3fce3b2098c2ffb" },
+    { "name": "Veeam Technical Specialist - SaaS Protection", "notionUrl": "https://app.notion.com/p/266a25f1dd2d80ca8b8af5cac45942f1" },
+    { "name": "Veeam Technical Specialist: Off-Site Backup", "notionUrl": "https://app.notion.com/p/267a25f1dd2d8021ab41db7728b5d54a" },
+    { "name": "Veeam Technical Specialist: DRaaS", "notionUrl": "https://app.notion.com/p/267a25f1dd2d8094961eef268412fd2d" },
+    { "name": "Onboarding for Veeam Data Platform", "notionUrl": "https://app.notion.com/p/260a25f1dd2d808fa4f0f38c4d39f04d" }
+  ]
+}

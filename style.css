@@ -1,0 +1,91 @@
+/* Same color/typography tokens as barnyard-hub's style.css, so this site
+   reads as part of the same barnyard.site family rather than a visually
+   unrelated page. Kept as an independent copy (not a shared stylesheet
+   fetched cross-origin) since these are two separate static-hosted repos
+   with no shared build step. */
+:root{
+  --bg:#0b0f14; --surface:#12181f; --surface-2:#161d25; --border:#1e2732;
+  --text:#c9d2db; --text-dim:#6b7885; --text-bright:#eef2f6;
+  --amber:#e8a33d; --amber-dim:#8a641f; --amber-bg:rgba(232,163,61,.10);
+  --blue:#5b9fe8; --blue-dim:#2f5c8a; --blue-bg:rgba(91,159,232,.12);
+  --up:#4cc38a;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --sans:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+
+*{box-sizing:border-box;}
+html{overflow-x:hidden;}
+body{
+  font-family:var(--sans);max-width:900px;margin:0 auto;padding:16px;
+  line-height:1.5;background:var(--bg);color:var(--text);
+}
+
+a{color:var(--amber);}
+a:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+
+header.study-header{padding:28px 4px 20px;border-bottom:1px solid var(--border);margin-bottom:28px;}
+.wordmark{font-size:1.6rem;font-weight:800;letter-spacing:-.01em;color:var(--text-bright);text-transform:uppercase;margin:0 0 4px;}
+.tagline{color:var(--text-dim);font-size:.9rem;margin:0;}
+.back-link{display:inline-block;margin-top:10px;font-size:.82rem;color:var(--text-dim);}
+.back-link:hover{color:var(--amber);}
+
+h2.section-heading{
+  font-size:.85rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-dim);margin:0 0 14px;
+}
+section.cert-section{margin-bottom:36px;}
+
+.cert-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;}
+
+.cert-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:16px 20px;
+}
+.cert-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.cert-name{font-size:1.02rem;font-weight:700;color:var(--text-bright);margin:0;}
+.cert-status{
+  font-size:.68rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 8px;border-radius:3px;white-space:nowrap;
+}
+.cert-status.in-progress{background:var(--blue-bg);color:var(--blue);}
+.cert-status.not-started{background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border);}
+.cert-status.done{background:rgba(76,195,138,.12);color:var(--up);}
+
+.cert-links{margin:8px 0 0;font-size:.82rem;display:flex;gap:14px;flex-wrap:wrap;}
+.cert-links a{display:inline-flex;align-items:center;gap:4px;}
+
+/* Completed certs render as a flatter, de-emphasized list (matching
+   .tile-placeholder's dim treatment in barnyard-hub) -- the point of this
+   page is the ongoing/active study queue, not an equally-weighted trophy
+   case, so completed entries are still linked but visually quieter. */
+.cert-list.completed .cert-card{padding:10px 16px;}
+.cert-list.completed .cert-name{font-size:.92rem;color:var(--text);}
+.cert-list.completed .cert-head{gap:8px;}
+
+/* Revision notes -- a native <details>/<summary> disclosure needs no JS to
+   expand/collapse, and keeps the collapsed state genuinely collapsed from
+   assistive tech too (unlike a JS-toggled max-height:0 trick). */
+.revision-notes{margin-top:14px;border-top:1px solid var(--border);padding-top:12px;}
+.revision-notes summary{
+  cursor:pointer;font-size:.82rem;font-weight:700;color:var(--amber);
+  list-style:none;display:flex;align-items:center;gap:6px;
+}
+.revision-notes summary::-webkit-details-marker{display:none;}
+.revision-notes summary::before{content:"▸";display:inline-block;transition:transform .15s ease;}
+.revision-notes[open] summary::before{transform:rotate(90deg);}
+.revision-notes summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+
+.notes-body{margin-top:12px;font-size:.88rem;color:var(--text);}
+.notes-body h3{font-size:.82rem;font-weight:800;letter-spacing:.02em;color:var(--text-bright);margin:16px 0 6px;}
+.notes-body h3:first-child{margin-top:0;}
+.notes-body ul{margin:4px 0 10px;padding-left:20px;}
+.notes-body li{margin-bottom:3px;}
+.notes-body p{margin:4px 0 10px;}
+
+.cert-empty-note{color:var(--text-dim);font-size:.82rem;margin:8px 0 0;}
+.generated-note{color:var(--text-dim);font-size:.75rem;margin:0 0 28px;}
+
+footer.study-footer{
+  border-top:1px solid var(--border);margin-top:20px;padding:20px 4px;
+  color:var(--text-dim);font-size:.8rem;
+}

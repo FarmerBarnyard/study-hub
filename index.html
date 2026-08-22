@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'self'; form-action 'none';">
+<title>Study</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="study-header">
+  <p class="wordmark">Study</p>
+  <p class="tagline">Certifications in progress, and the notes that go with them.</p>
+  <a class="back-link" href="https://dashboard.barnyard.site/">&larr; Back to Barnyard</a>
+</header>
+
+<main id="main-content">
+
+  <p class="generated-note" id="generated-note"></p>
+
+  <section class="cert-section" aria-labelledby="ongoing-heading">
+    <h2 class="section-heading" id="ongoing-heading">Ongoing</h2>
+    <ul class="cert-list" id="ongoing-list" role="list"></ul>
+  </section>
+
+  <section class="cert-section" aria-labelledby="completed-heading">
+    <h2 class="section-heading" id="completed-heading">Completed</h2>
+    <ul class="cert-list completed" id="completed-list" role="list"></ul>
+  </section>
+
+</main>
+
+<footer class="study-footer">
+  Study hub &mdash; static landing page, no account needed to browse, no third-party tracking, no live Notion connection from this page. The certification list and revision notes are a static snapshot, refreshed periodically from Notion by a separate process (see the repo's README) and committed here &mdash; this page itself makes no calls to Notion or any other third-party service.
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
