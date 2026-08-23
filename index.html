@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'self'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.barnyard.site; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'self'; form-action 'none';">
 <title>Study &mdash; Barnyard</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -37,7 +37,7 @@
 </main>
 
 <footer class="study-footer">
-  Study hub &mdash; static landing page, no account needed to browse, no third-party tracking, no live Notion connection from this page. The certification list and revision notes are a static snapshot, refreshed periodically from Notion by a separate process (see the repo's README) and committed here &mdash; this page itself makes no calls to Notion or any other third-party service.
+  Study hub &mdash; static landing page, no account needed to browse, no third-party tracking. The certification list and pre-authored revision notes are a static snapshot, refreshed periodically from Notion by a separate process (see the repo's README) and committed here. The one exception is the "Generate revision notes" button: clicking it calls a Cloudflare Worker that reads the certification's Notion page and asks Claude to summarize it on your behalf, and caches the result only in this browser.
 </footer>
 
 <script src="app.js"></script>

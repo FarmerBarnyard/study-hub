@@ -93,6 +93,18 @@ section.cert-section{margin-bottom:36px;}
 .cert-empty-note{color:var(--text-dim);font-size:.82rem;margin:8px 0 0;}
 .generated-note{color:var(--text-dim);font-size:.75rem;margin:0 0 28px;}
 
+/* Matches barnyard-hub's .weather-locate-btn/.todo-add-btn visual language
+   (surface-2 fill, border, amber hover/focus) so this reads as the same
+   design system rather than a generic browser button. */
+.generate-notes-btn{
+  display:block;margin-top:12px;font-family:var(--sans);font-size:.78rem;font-weight:700;
+  color:var(--text-bright);background:var(--surface-2);border:1px solid var(--border);
+  border-radius:4px;padding:6px 12px;cursor:pointer;transition:border-color .15s ease;
+}
+.generate-notes-btn:hover{border-color:var(--amber-dim);}
+.generate-notes-btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+.generate-notes-btn:disabled{opacity:.6;cursor:default;}
+
 footer.study-footer{
   border-top:1px solid var(--border);margin-top:20px;padding:20px 4px;
   color:var(--text-dim);font-size:.8rem;

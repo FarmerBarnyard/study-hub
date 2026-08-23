@@ -7,8 +7,21 @@ No build step, no framework — plain HTML/CSS/vanilla JS, deployed via GitHub P
 ## Architecture
 
 - `index.html` / `style.css` / `app.js` — the page shell and renderer. `app.js` fetches `data.json` client-side and builds the ongoing/completed lists; revision notes (`notes/*.html`) are fetched lazily, only when a cert's "Revision notes" `<details>` is expanded.
-- `data.json` — the certification list (name, status, Notion link, notes reference). **This is a static, committed snapshot, not a live query** — the page itself never calls the Notion API (that would require exposing a Notion integration token client-side, which this site deliberately never does).
-- `notes/*.html` — revision-notes fragments, one per certification that has them. Plain semantic HTML (`<h3>`/`<ul>`/`<p>`), injected via `innerHTML` in `app.js` — safe because these are build-time-generated trusted files, not user input (unlike barnyard-hub's calendar/to-do data, which is untrusted and stays `textContent`-only).
+- `data.json` — the certification list (name, status, Notion link, notes reference). **This is a static, committed snapshot, not a live query** — the page itself never calls the Notion API directly (that would require exposing a Notion integration token client-side, which this site deliberately never does). The one live call this site does make is the "Generate revision notes" button below.
+- `notes/*.html` — pre-authored revision-notes fragments, one per certification that has them at build time. Plain semantic HTML (`<h3>`/`<ul>`/`<p>`), injected via `innerHTML` in `app.js` — safe because these are build-time-generated trusted files, not user input (unlike barnyard-hub's calendar/to-do data, which is untrusted and stays `textContent`-only).
+
+## "Generate revision notes" button (live, on-demand generation)
+
+Every `ongoing` cert with a `slug` in `data.json` gets a "Generate revision notes" (or "Regenerate notes", if content already exists) button. Clicking it calls `POST https://api.barnyard.site/generate-notes` — a Cloudflare Worker route (in the separate `ClaudeRepo` repo's `cloudflare-worker/`) that fetches the cert's Notion page content server-side and asks Claude to condense it into structured revision notes, returned as JSON.
+
+**This is a real, paid API call every time it's clicked** — see `ClaudeRepo/cloudflare-worker/README.md`'s "Revision notes generation setup" section for the full cost breakdown, the setup steps (a Notion integration + an Anthropic API key, both set as Worker secrets — this repo has no involvement in that setup), and the honest limits of this route's abuse-mitigation (no real authentication, by design — see that README for why).
+
+Freshly generated notes are rendered via `createElement`/`textContent` (not `innerHTML` — this content is model-generated at request time, not pre-authored trusted content the way `notes/*.html` fragments are) and cached in **this browser's own `localStorage` only**. That means:
+- A repeat visit from the same browser shows the cached version instantly, with no new API call, until "Regenerate notes" is clicked again.
+- The generated notes are **not synced anywhere** — a different browser, device, or visitor sees the static `notes/*.html` fragment (if one exists) or the "Generate" button again, never someone else's generated copy. This is a deliberate, low-effort choice to avoid needing a second write-back mechanism (e.g. committing to this repo via the GitHub API) for what is fundamentally a single-user personal site.
+- A cached generated version takes precedence over the static `notes/*.html` fragment on that same browser, on the assumption that a click-triggered regeneration is newer/more current than whatever was last committed.
+
+Adding "Generate" support for a new cert requires **two separate changes**, not one: add a `"slug"` field to that cert's entry in `data.json` here, AND add a matching entry to `CERT_NOTION_PAGES` in the Worker's `src/index.js` (in `ClaudeRepo`). The slug must match exactly (`^[a-z0-9-]+$`, matching the Worker's own allowlist keys) — `app.js`'s `normalizeCert()` silently drops anything else, and the Worker independently rejects any slug it doesn't recognize.
 
 ## Where the data comes from
 
@@ -26,7 +39,8 @@ Source of truth is the **✅ Knowledgebase** database in the "Claude PM Workspac
       "fullName": "SC-300: Microsoft Identity and Access Administrator", // optional; omit or match `name` to suppress the subtitle line
       "status": "In progress",                                       // "In progress" | "Not started" | "Done" — drives the badge color
       "notionUrl": "https://app.notion.com/…",                       // required for a "View notes in Notion" link to render at all
-      "notesUrl": "notes/sc-300.html"                                // optional; omit entirely if no revision notes exist yet
+      "notesUrl": "notes/sc-300.html",                               // optional; omit entirely if no pre-authored revision notes exist yet
+      "slug": "sc-300"                                               // optional; enables the "Generate/Regenerate notes" button -- must match a key in the Worker's CERT_NOTION_PAGES allowlist (see below)
     }
   ],
   "completed": [
@@ -49,7 +63,7 @@ This has no CI pipeline (unlike ClaudeRepo's market-dashboard pipeline) — refr
 4. Update `data.json`'s top-level `generated` date.
 5. Commit and push to `main` — GitHub Pages redeploys automatically.
 
-This was last done by hand on 2026-08-23 (initial build). Repeating this on a schedule (e.g. weekly) is the intended long-term shape of "automatically create study revision notes" — check the Claude PM Workspace's Progress Planner entry for this project for whether a scheduled task has actually been set up yet before assuming this happens without being triggered.
+This was last done by hand on 2026-08-23 (initial build). It produces the **pre-authored baseline** shown to any visitor with no localStorage cache of their own — the "Generate/Regenerate notes" button above is the complementary on-demand path for the account owner's own browser, and doesn't require this manual process to be repeated on a schedule. A scheduled agent-driven refresh of this baseline (step 1-2 above) is still worth doing periodically to keep the ongoing/completed split itself current — check the Claude PM Workspace's Progress Planner entry for this project for whether that's been set up.
 
 ## Deploy
 

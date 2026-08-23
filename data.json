@@ -7,19 +7,22 @@
       "fullName": "SC-300: Microsoft Identity and Access Administrator",
       "status": "In progress",
       "notionUrl": "https://app.notion.com/p/2eba25f1dd2d8082b7caedc65d5392bc",
-      "notesUrl": "notes/sc-300.html"
+      "notesUrl": "notes/sc-300.html",
+      "slug": "sc-300"
     },
     {
       "name": "AZ-900",
       "fullName": "AZ-900: Microsoft Azure Fundamentals",
       "status": "Not started",
-      "notionUrl": "https://app.notion.com/p/255a25f1dd2d808389eac7e1ff8a8357"
+      "notionUrl": "https://app.notion.com/p/255a25f1dd2d808389eac7e1ff8a8357",
+      "slug": "az-900"
     },
     {
       "name": "AZ-104",
       "fullName": "AZ-104: Microsoft Azure Administrator",
       "status": "Not started",
-      "notionUrl": "https://app.notion.com/p/255a25f1dd2d80ebba63c8804ff3abde"
+      "notionUrl": "https://app.notion.com/p/255a25f1dd2d80ebba63c8804ff3abde",
+      "slug": "az-104"
     }
   ],
   "completed": [
