@@ -165,6 +165,11 @@
       method: "POST",
       signal: controller.signal,
       referrerPolicy: "no-referrer",
+      // Required now that /generate-notes checks a login session -- without
+      // this the browser never sends the session cookie cross-origin at
+      // all, and every call 401s regardless of login state (2026-09-02
+      // security review, M2).
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slug: slug })
     })
