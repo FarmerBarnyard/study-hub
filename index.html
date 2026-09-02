@@ -10,9 +10,12 @@
 <body>
 
 <header class="study-header">
-  <h1 class="wordmark">Study</h1>
-  <p class="tagline">Certifications in progress, and the notes that go with them.</p>
-  <a class="back-link" href="https://dashboard.barnyard.site/">&larr; Back to Barnyard</a>
+  <div class="study-header-main">
+    <h1 class="wordmark">Study</h1>
+    <p class="tagline">Certifications in progress, and the notes that go with them.</p>
+    <a class="back-link" href="https://dashboard.barnyard.site/">&larr; Back to Barnyard</a>
+  </div>
+  <div class="auth-status" id="auth-status"></div>
 </header>
 
 <noscript>
@@ -40,6 +43,7 @@
   Study hub &mdash; static landing page, no account needed to browse, no third-party tracking. The certification list and pre-authored revision notes are a static snapshot, refreshed periodically from Notion by a separate process (see the repo's README) and committed here. The one exception is the "Generate revision notes" button: clicking it calls a Cloudflare Worker that reads the certification's Notion page and asks Claude to summarize it on your behalf, and caches the result only in this browser.
 </footer>
 
+<script src="auth-gate.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

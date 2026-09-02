@@ -23,11 +23,28 @@ body{
 a{color:var(--amber);}
 a:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
 
-header.study-header{padding:28px 4px 20px;border-bottom:1px solid var(--border);margin-bottom:28px;}
+header.study-header{
+  padding:28px 4px 20px;border-bottom:1px solid var(--border);margin-bottom:28px;
+  display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;
+}
 .wordmark{font-size:1.6rem;font-weight:800;letter-spacing:-.01em;color:var(--text-bright);text-transform:uppercase;margin:0 0 4px;}
 .tagline{color:var(--text-dim);font-size:.9rem;margin:0;}
 .back-link{display:inline-block;margin-top:10px;font-size:.82rem;color:var(--text-dim);}
 .back-link:hover{color:var(--amber);}
+
+/* Login status, top-right of the header -- see auth-gate.js. Same treatment
+   as barnyard-hub's own .auth-status (hand-copied file, kept visually
+   consistent by hand too). */
+.auth-status{display:flex;align-items:center;gap:8px;font-size:.82rem;padding-top:4px;white-space:nowrap;}
+.auth-status-label{color:var(--text-dim);}
+.auth-login-link{font-weight:700;}
+.auth-logout-btn{
+  font-family:var(--sans);font-size:.72rem;font-weight:700;
+  color:var(--text-bright);background:var(--surface-2);border:1px solid var(--border);
+  border-radius:4px;padding:3px 8px;cursor:pointer;transition:border-color .15s ease;
+}
+.auth-logout-btn:hover{border-color:var(--amber-dim);}
+.auth-logout-btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
 
 h2.section-heading{
   font-size:.85rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;

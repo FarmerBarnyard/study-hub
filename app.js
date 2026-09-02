@@ -209,6 +209,20 @@
       return "Couldn't reach the notes service. Check your connection and try again.";
     }
     var msg = err && typeof err.message === "string" ? err.message : "";
+    // These two are genuinely different states, not one generic "not
+    // allowed" -- the client-side login gate below (see wireNotesArea)
+    // should normally prevent "unauthenticated" from ever reaching here,
+    // but auth state can go stale between page load and a click, so this
+    // stays as the honest fallback either way. "forbidden" means logged in
+    // but missing the AD group this action requires -- the client-side gate
+    // can't know that in advance, since /auth/session deliberately doesn't
+    // return group membership (see the Worker's own /auth/* section).
+    if (msg === "unauthenticated") {
+      return "You're not logged in. Log in and try again.";
+    }
+    if (msg === "forbidden") {
+      return "You're logged in, but don't have access to generate notes.";
+    }
     if (msg === "unknown certification" || msg === "not enough content in Notion yet to generate notes") {
       return "Couldn't generate revision notes: " + msg + ".";
     }
@@ -242,7 +256,7 @@
   // moment a generation succeeds, so a static response that arrives after
   // that point is simply discarded instead of overwriting the freshly
   // generated (and, for a live generation, already paid-for) content.
-  function wireNotesArea(details, body, certRef, cachedNotes) {
+  function wireNotesArea(details, body, certRef, cachedNotes, authState) {
     var contentSource = cachedNotes ? "generated" : null;
     var staticLoaded = false;
     var staticController = null;
@@ -284,7 +298,7 @@
 
     if (cachedNotes) showGenerated(cachedNotes.sections, cachedNotes.generatedAt);
 
-    if (certRef.slug) {
+    if (certRef.slug && authState && authState.authenticated) {
       // Cost/latency disclosure shown up front, before any click -- not
       // only inside the in-flight status message, which a first-time
       // visitor would only see after the (irreversible, billed) request is
@@ -317,6 +331,21 @@
             button.removeAttribute("aria-busy");
           });
       });
+    } else if (certRef.slug) {
+      // Not logged in (or auth state couldn't be checked -- fails closed to
+      // this state, same as barnyardAuthState()'s own fallback) -- show a
+      // login prompt in place of an active button, rather than letting a
+      // click reach the server just to bounce off a 401. Viewing already-
+      // cached notes above is unaffected -- only starting a NEW generation
+      // needs a session.
+      hint = document.createElement("p");
+      hint.className = "cert-empty-note";
+      hint.textContent = "Log in to generate revision notes for this certification.";
+
+      button = document.createElement("a");
+      button.className = "generate-notes-btn";
+      button.href = typeof window.barnyardLoginUrl === "function" ? window.barnyardLoginUrl() : "https://api.barnyard.site/auth/login";
+      button.textContent = "Log in to generate notes";
     }
 
     if (certRef.notesUrl) {
@@ -353,7 +382,7 @@
     return { hint: hint, button: button, status: status, generatedNote: generatedNote };
   }
 
-  function buildCertCard(rawCert, isCompleted) {
+  function buildCertCard(rawCert, isCompleted, authState) {
     var cert = normalizeCert(rawCert);
     var li = document.createElement("li");
     li.className = "cert-card";
@@ -413,7 +442,7 @@
       details.appendChild(summary);
       details.appendChild(body);
 
-      var parts = wireNotesArea(details, body, { notesUrl: cert.notesUrl, slug: effectiveSlug }, cachedNotes);
+      var parts = wireNotesArea(details, body, { notesUrl: cert.notesUrl, slug: effectiveSlug }, cachedNotes, authState);
       if (parts.hint) details.appendChild(parts.hint);
       if (parts.button) details.appendChild(parts.button);
       details.appendChild(parts.status);
@@ -437,7 +466,7 @@
     return document.getElementById("loading-note");
   }
 
-  function render(data) {
+  function render(data, authState) {
     var ongoingList = document.getElementById("ongoing-list");
     var completedList = document.getElementById("completed-list");
     var generatedNote = document.getElementById("generated-note");
@@ -446,12 +475,12 @@
 
     if (ongoingList) {
       (data.ongoing || []).forEach(function (cert) {
-        ongoingList.appendChild(buildCertCard(cert, false));
+        ongoingList.appendChild(buildCertCard(cert, false, authState));
       });
     }
     if (completedList) {
       (data.completed || []).forEach(function (cert) {
-        completedList.appendChild(buildCertCard(cert, true));
+        completedList.appendChild(buildCertCard(cert, true, authState));
       });
     }
     if (generatedNote && typeof data.generated === "string" && data.generated) {
@@ -475,7 +504,21 @@
 
   if (typeof document !== "undefined") {
     document.addEventListener("DOMContentLoaded", function () {
-      fetchWithTimeout(DATA_URL, "json").then(render).catch(renderError);
+      // barnyardAuthState() (from auth-gate.js, loaded before this file --
+      // see index.html's script order) always resolves, never rejects (see
+      // its own comment), so Promise.all here can't fail because of it --
+      // only a real data.json failure reaches renderError below. Falls back
+      // to "not authenticated" if auth-gate.js somehow isn't loaded, same
+      // fail-closed treatment used throughout.
+      var authStatePromise =
+        typeof window.barnyardAuthState === "function"
+          ? window.barnyardAuthState()
+          : Promise.resolve({ authenticated: false });
+      Promise.all([fetchWithTimeout(DATA_URL, "json"), authStatePromise])
+        .then(function (results) {
+          render(results[0], results[1]);
+        })
+        .catch(renderError);
     });
   }
 
