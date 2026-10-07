@@ -65,6 +65,14 @@ This has no CI pipeline (unlike ClaudeRepo's market-dashboard pipeline) — refr
 
 This was last done by hand on 2026-08-23 (initial build). It produces the **pre-authored baseline** shown to any visitor with no localStorage cache of their own — the "Generate/Regenerate notes" button above is the complementary on-demand path for the account owner's own browser, and doesn't require this manual process to be repeated on a schedule. A scheduled agent-driven refresh of this baseline (step 1-2 above) is still worth doing periodically to keep the ongoing/completed split itself current — check the Claude PM Workspace's Progress Planner entry for this project for whether that's been set up.
 
+## Shared shell and themes (2026-10-08)
+
+This page now sits in the same shell as the dashboard: a left sidebar (Overview, Ops board, Study, Campaign, Stocks), a top bar (jump search, light/dark, Settings) and a Settings panel with 18 colour themes, 18 backgrounds, density and sidebar options. The choice follows you between the barnyard.site pages through a small `bh_prefs` cookie (look-and-feel keys only, validated on read).
+
+- `themes.js`, `shell.js`, `shell.css` and `fonts/` are **hand-copied unchanged from barnyard-hub**, the same way `auth-gate.js` is. They are not edited here; change them in barnyard-hub and copy them out again. `test/shell.test.js` checks them (every theme readable in both modes, every background has CSS, the page stays inside its CSP).
+- `style.css` is now only this page's own layout (certification rows, status dots, revision notes, the generate button).
+- The Notion sync note turns red and says how old the snapshot is once it passes 14 days (`describeSync` in `app.js`, tested), because a stale list looks exactly like a current one.
+- Script order matters: `shell.js` before `auth-gate.js` (it creates `#auth-status`), `themes.js` in `<head>`.
 ## Deploy
 
 GitHub Pages, custom domain `study.barnyard.site` (see `CNAME`), DNS + TLS via Cloudflare (proxied CNAME on the `barnyard.site` zone, matching `dashboard`/`stocks`/`api`'s existing setup).

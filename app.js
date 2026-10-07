@@ -133,6 +133,23 @@
     }
   }
 
+  // How old the Notion snapshot is, in words. `generated` is data.json's
+  // plain "YYYY-MM-DD" date; a snapshot older than SYNC_STALE_DAYS is flagged,
+  // since a stale list reads exactly like a current one. An unparsable date
+  // falls back to the raw text and is never flagged.
+  var SYNC_STALE_DAYS = 14;
+  function describeSync(generated, now) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(generated);
+    if (!m) return { text: "Last synced from Notion: " + generated, stale: false, days: null };
+    var then = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    var today = new Date(now);
+    today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    var days = Math.max(0, Math.round((today.getTime() - then.getTime()) / 86400000));
+    var when = then.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    if (days >= SYNC_STALE_DAYS) return { text: "Notion sync is " + days + " days old (last synced " + when + ")", stale: true, days: days };
+    return { text: "Last synced from Notion on " + when, stale: false, days: days };
+  }
+
   // Renders Claude-generated sections via createElement/textContent only --
   // unlike the pre-authored notes/*.html fragments (trusted, build-time
   // content, injected via innerHTML further down), this content is
@@ -484,7 +501,9 @@
       });
     }
     if (generatedNote && typeof data.generated === "string" && data.generated) {
-      generatedNote.textContent = "Last synced from Notion: " + data.generated;
+      var sync = describeSync(data.generated, Date.now());
+      generatedNote.textContent = sync.text;
+      if (sync.stale) generatedNote.classList.add("is-stale");
     }
   }
 
@@ -533,7 +552,8 @@
       friendlyGenerateError: friendlyGenerateError,
       loadCachedNotes: loadCachedNotes,
       saveCachedNotes: saveCachedNotes,
-      formatGeneratedAt: formatGeneratedAt
+      formatGeneratedAt: formatGeneratedAt,
+      describeSync: describeSync
     };
   }
 })();

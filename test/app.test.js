@@ -211,4 +211,34 @@ test("loadCachedNotes: an entry older than the 30-day max age is treated as expi
   assert.notStrictEqual(app.loadCachedNotes("fresh"), null);
 });
 
+// ---- describeSync ----------------------------------------------------------
+// The page flags a Notion snapshot that has gone stale, because an old list
+// reads exactly like a current one.
+
+test("describeSync: a recent snapshot is a plain date, not flagged", function () {
+  var s = app.describeSync("2026-10-01", new Date(2026, 9, 7, 12, 0, 0).getTime());
+  assert.strictEqual(s.stale, false);
+  assert.strictEqual(s.days, 6);
+  assert.ok(/^Last synced from Notion on /.test(s.text));
+});
+
+test("describeSync: 14 days or older is flagged and says how old", function () {
+  var now = new Date(2026, 9, 7, 12, 0, 0).getTime();
+  assert.strictEqual(app.describeSync("2026-09-24", now).stale, false, "13 days is still fine");
+  var s = app.describeSync("2026-09-23", now);
+  assert.strictEqual(s.stale, true);
+  assert.strictEqual(s.days, 14);
+  assert.ok(/^Notion sync is 14 days old \(last synced /.test(s.text));
+  assert.strictEqual(app.describeSync("2026-08-23", now).days, 45);
+});
+
+test("describeSync: today and a future date count as zero days, an odd value is shown as-is and never flagged", function () {
+  var now = new Date(2026, 9, 7, 23, 59, 0).getTime();
+  assert.strictEqual(app.describeSync("2026-10-07", now).days, 0);
+  assert.strictEqual(app.describeSync("2026-12-25", now).days, 0);
+  var odd = app.describeSync("last Tuesday", now);
+  assert.strictEqual(odd.stale, false);
+  assert.strictEqual(odd.days, null);
+  assert.strictEqual(odd.text, "Last synced from Notion: last Tuesday");
+});
 console.log(passed + " passed");
