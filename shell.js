@@ -3,7 +3,15 @@
 //
 // A page supplies only its own content, inside <main id="page" class="content">,
 // and says which page it is with <body data-shell="overview|ops|study|campaign|stocks">.
-// This script wraps that content in the shell. Load order on a page:
+// This script wraps that content in the shell.
+//
+// A generated page whose body this repo does not author (the Stocks dashboard,
+// its ticker pages and its archive) may leave both out: with no #page the
+// script wraps everything in <body> (except scripts) in one, and with no
+// data-shell it works out the site from the hostname. Such a page loads the
+// script with `defer` from <head>, so the whole body exists when it runs.
+//
+// Load order on a page that authors its own body:
 //
 //   <head>   themes.js            (applies the saved theme before first paint)
 //   <body>   <main id="page">…</main>
@@ -79,7 +87,17 @@
     return onBarnyard ? HUB + p.path : p.local;
   }
 
-  var current = document.body.getAttribute("data-shell") || "overview";
+  // Which site this is, for pages that do not say (see the header comment).
+  function inferCurrent() {
+    var host = location.hostname;
+    if (/^study\./.test(host)) return "study";
+    if (/^campaign\./.test(host)) return "campaign";
+    if (/^stocks\./.test(host)) return "stocks";
+    if (/(^|\/)ops\.html$/.test(location.pathname)) return "ops";
+    return "overview";
+  }
+
+  var current = document.body.getAttribute("data-shell") || inferCurrent();
   var tabs = [{ id: "appearance", title: "Appearance", render: appearanceTab }];
   var searchSource = null;
   var els = {};
@@ -87,8 +105,6 @@
   // ---- build ---------------------------------------------------------------
 
   function build() {
-    var page = document.getElementById("page");
-    if (!page) return;
     if (!document.getElementById("bg")) {
       var bg = h("div", "bg bgx-" + Theme.get().bg);
       bg.id = "bg";
@@ -96,6 +112,20 @@
       document.body.insertBefore(bg, document.body.firstChild);
     }
     els.bg = document.getElementById("bg");
+
+    var page = document.getElementById("page");
+    if (!page) {
+      // A generated page with no #page: adopt the whole body (scripts stay
+      // where they are, they have already run). Event listeners and ids
+      // survive the move, so the page's own scripts keep working.
+      page = h("main", "content");
+      page.id = "page";
+      var kids = Array.prototype.slice.call(document.body.childNodes).filter(function (n) {
+        return n !== els.bg && !(n.nodeType === 1 && (n.tagName === "SCRIPT" || n.tagName === "NOSCRIPT"));
+      });
+      document.body.insertBefore(page, els.bg.nextSibling);
+      kids.forEach(function (n) { page.appendChild(n); });
+    }
 
     var app = h("div", "app");
     var side = h("aside", "side");
