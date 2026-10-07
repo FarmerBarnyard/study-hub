@@ -19,6 +19,9 @@
 //     so choosing a theme on one site carries to dashboard/study/campaign/
 //     stocks. It holds no identity, only six short preference codes, and every
 //     value read back from it is checked against the lists below before use.
+//   - the signed-in user's profile (api.barnyard.site/prefs): everything, so it
+//     follows the person to any browser. See "saving to the signed-in user's
+//     profile" below; BarnyardTheme.sync is its API.
 //
 // NOTE: like auth-gate.js, this file is hand-copied into each site's repo (none
 // has a build step). Keep the copies identical.
@@ -249,11 +252,182 @@
     writeStorage(current);
     writeCookie(current);
     apply(current);
+    touchSync();
     notify();
     return current;
   }
 
   function reset() { return set(defaults()); }
+
+  // ---- saving to the signed-in user's profile -----------------------------------
+  //
+  // The Worker keeps one copy of the settings per login (GET/PUT/DELETE
+  // https://api.barnyard.site/prefs), so the same look loads in any browser.
+  // The browser stays the fast path: everything above applies instantly and
+  // offline, and nothing here blocks the page. After sign-in we compare the
+  // profile with this browser and either upload or adopt:
+  //
+  //   - the browser's own changes go up about 1.5 s after the last one;
+  //   - a profile saved from another browser comes down when this tab starts or
+  //     regains focus (at most every 30 s);
+  //   - last write wins. A change made here after the profile's last save beats
+  //     it; otherwise the profile does;
+  //   - the first time an account is seen on this browser, its saved profile
+  //     wins over what the browser had (the page offers "Keep this browser's");
+  //   - an untouched browser (all defaults) never uploads, so opening a new
+  //     browser cannot wipe a profile for the next one;
+  //   - signed out, or off barnyard.site, nothing is sent at all.
+  //
+  // Sync state (revision, which account, unsent changes) is in localStorage
+  // "barnyard-sync". It carries no identity beyond a one-way account label.
+
+  var PROFILE_API = "https://api.barnyard.site/prefs";
+  var SYNC_KEY = "barnyard-sync";
+  var PUSH_DELAY_MS = 1500, RECHECK_MS = 30000, RETRY_MS = 30000, MAX_RETRIES = 5, REQUEST_MS = 8000;
+
+  function sameSettings(a, b) { return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b)); }
+
+  // What to do with the profile the Worker just returned. Pure, so it is tested
+  // on its own. -> "none" | "record" | "upload" | "adopt" | "adopt-first" | "forgotten"
+  function decideSync(local, state, remote) {
+    state = state || {};
+    var customised = !sameSettings(local, defaults());
+    if (!remote || !remote.exists) {
+      if (state.rev) return state.dirty ? "upload" : "forgotten"; // deleted elsewhere
+      return state.dirty || customised ? "upload" : "none";
+    }
+    var theirs = normalize(remote.settings);
+    if (state.owner !== remote.owner) return sameSettings(local, theirs) ? "record" : "adopt-first";
+    if (remote.rev === state.rev) return state.dirty ? "upload" : "none";
+    if (state.dirty && state.changedAt > remote.updatedAt) return "upload";
+    return sameSettings(local, theirs) ? "record" : "adopt";
+  }
+
+  var syncState = {};
+  try { var rawSync = root.localStorage && JSON.parse(root.localStorage.getItem(SYNC_KEY)); if (rawSync && typeof rawSync === "object") syncState = rawSync; } catch (e) { syncState = {}; }
+  var syncStatus = "off"; // off | checking | signed-out | unsaved | saving | saved | retrying | error
+  var syncListeners = [], adoptListeners = [];
+  var syncStarted = false, applyingRemote = false, pushing = false, pushAgain = false, pushTimer = null, retryTimer = null, retries = 0, lastCheck = 0, syncedAt = 0;
+
+  function syncEnabled() { return onBarnyardSite() && typeof root.fetch === "function"; }
+  function saveSyncState() { try { root.localStorage.setItem(SYNC_KEY, JSON.stringify(syncState)); } catch (e) { /* kept for this page view */ } }
+  function setSyncStatus(next) {
+    syncStatus = next;
+    for (var i = 0; i < syncListeners.length; i++) { try { syncListeners[i](next, syncedAt); } catch (e) { /* one listener must not stop the rest */ } }
+  }
+
+  function profileRequest(method, body, keepalive) {
+    var opts = { method: method, credentials: "include", referrerPolicy: "no-referrer", headers: {} };
+    if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+    if (keepalive) opts.keepalive = true;
+    var timer = null;
+    if (typeof root.AbortController === "function") { var ctl = new root.AbortController(); opts.signal = ctl.signal; timer = root.setTimeout(function () { ctl.abort(); }, REQUEST_MS); }
+    return root.fetch(PROFILE_API, opts).then(function (res) {
+      if (timer) root.clearTimeout(timer);
+      return res.json().then(function (json) { return { status: res.status, json: json || {} }; }, function () { return { status: res.status, json: {} }; });
+    }, function (err) { if (timer) root.clearTimeout(timer); throw err; });
+  }
+
+  function scheduleRetry() {
+    root.clearTimeout(retryTimer);
+    if (++retries > MAX_RETRIES) { setSyncStatus("error"); return; }
+    retryTimer = root.setTimeout(function () { return syncState.dirty ? push() : pull(); }, RETRY_MS);
+  }
+  function schedulePush() {
+    if (syncStatus === "signed-out") return; // nothing to send to; the next pull clears this
+    root.clearTimeout(pushTimer);
+    pushTimer = root.setTimeout(function () { return push(); }, PUSH_DELAY_MS);
+  }
+
+  // Called by set() for a change the person made (never for a profile we applied).
+  function touchSync() {
+    if (applyingRemote || !syncEnabled()) return;
+    syncState.dirty = true;
+    syncState.changedAt = Date.now();
+    syncState.seq = (syncState.seq || 0) + 1; // tells a save in flight that a later change arrived
+    saveSyncState();
+    schedulePush();
+  }
+
+  function push(keepalive) {
+    root.clearTimeout(pushTimer); pushTimer = null;
+    if (!syncEnabled() || syncStatus === "signed-out") return Promise.resolve();
+    if (pushing) { pushAgain = true; return Promise.resolve(); }
+    pushing = true;
+    var token = syncState.seq || 0;
+    setSyncStatus("saving");
+    return profileRequest("PUT", { settings: current }, keepalive).then(function (r) {
+      if (r.status === 200) {
+        syncState.rev = r.json.rev; syncState.owner = r.json.owner;
+        if ((syncState.seq || 0) === token) syncState.dirty = false; else pushAgain = true;
+        syncedAt = Date.now(); retries = 0; saveSyncState();
+        setSyncStatus("saved");
+      } else if (r.status === 401) setSyncStatus("signed-out");
+      else if (r.status === 400 || r.status === 413) setSyncStatus("error");
+      else { setSyncStatus("retrying"); scheduleRetry(); }
+    }, function () { setSyncStatus("retrying"); scheduleRetry(); }).then(function () {
+      pushing = false;
+      if (pushAgain) { pushAgain = false; schedulePush(); }
+    });
+  }
+
+  function pull() {
+    if (!syncEnabled()) return Promise.resolve();
+    lastCheck = Date.now();
+    if (syncStatus === "off") setSyncStatus("checking");
+    return profileRequest("GET").then(function (r) {
+      if (r.status === 401) { setSyncStatus("signed-out"); return; }
+      if (r.status !== 200) { setSyncStatus("retrying"); scheduleRetry(); return; }
+      retries = 0;
+      var action = decideSync(current, syncState, r.json);
+      if (action === "upload") { if (syncStatus === "signed-out") setSyncStatus("checking"); return push(); }
+      if (action === "forgotten") { syncState = {}; saveSyncState(); setSyncStatus("unsaved"); return; }
+      if (action === "none") { setSyncStatus(r.json.exists ? "saved" : "unsaved"); if (r.json.exists && !syncedAt) syncedAt = r.json.updatedAt; return; }
+      var previous = current;
+      if (action === "adopt" || action === "adopt-first") {
+        applyingRemote = true;
+        try { set(normalize(r.json.settings)); } finally { applyingRemote = false; }
+      }
+      syncState = { rev: r.json.rev, owner: r.json.owner, dirty: false, changedAt: syncState.changedAt || 0, seq: syncState.seq || 0 };
+      syncedAt = r.json.updatedAt; saveSyncState();
+      setSyncStatus("saved");
+      if (action !== "record") {
+        for (var i = 0; i < adoptListeners.length; i++) { try { adoptListeners[i]({ first: action === "adopt-first", previous: previous }); } catch (e) { /* ignore */ } }
+      }
+    }, function () { setSyncStatus("retrying"); scheduleRetry(); });
+  }
+
+  function forgetProfile() {
+    if (!syncEnabled()) return Promise.resolve(false);
+    return profileRequest("DELETE").then(function (r) {
+      if (r.status !== 200) return false;
+      syncState = {}; saveSyncState(); syncedAt = 0;
+      setSyncStatus("unsaved");
+      return true;
+    }, function () { return false; });
+  }
+
+  function startSync() {
+    if (syncStarted || !syncEnabled()) return;
+    syncStarted = true;
+    pull();
+    var doc = root.document;
+    if (doc && doc.addEventListener) {
+      doc.addEventListener("visibilitychange", function () {
+        if (doc.visibilityState === "hidden") { if (syncState.dirty) push(true); }
+        else if (Date.now() - lastCheck > RECHECK_MS) pull();
+      });
+    }
+  }
+
+  var sync = {
+    start: startSync, pull: pull, forget: forgetProfile, decide: decideSync,
+    flush: function () { return push(); },
+    status: function () { return syncStatus; },
+    syncedAt: function () { return syncedAt; },
+    onStatus: function (fn) { syncListeners.push(fn); },
+    onAdopt: function (fn) { adoptListeners.push(fn); }
+  };
 
   var api = {
     THEMES: THEMES, THEME_GROUPS: THEME_GROUPS, BACKGROUNDS: BACKGROUNDS, BACKGROUND_GROUPS: BACKGROUND_GROUPS,
@@ -262,12 +436,16 @@
     contrastRatio: contrastRatio, findTheme: findTheme, themeColours: themeColours, isDark: isDark,
     load: load, set: set, reset: reset, apply: apply,
     get: function () { return current; },
-    onChange: function (fn) { listeners.push(fn); }
+    onChange: function (fn) { listeners.push(fn); },
+    sync: sync
   };
 
   root.BarnyardTheme = api;
   if (root.document && root.document.documentElement) {
     load();
+    // Start the profile sync once the page has had its first paint.
+    var startLater = function () { root.setTimeout(startSync, 300); };
+    if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", startLater); else startLater();
     if (root.matchMedia) {
       try { root.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (current.mode === "system") { apply(current); notify(); } }); } catch (e) { /* older browsers: the next load picks it up */ }
     }

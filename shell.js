@@ -293,6 +293,78 @@
     toastTimer = setTimeout(function () { els.toast.classList.remove("show"); els.toast.style.pointerEvents = ""; }, (action && action.ms) || 2400);
   }
 
+  // ---- saved-profile note (Settings footer) --------------------------------------
+  //
+  // The sync itself lives in themes.js (BarnyardTheme.sync); this only says what
+  // it is doing, offers sign-in when signed out, and lets the person remove the
+  // saved profile.
+
+  var LOGIN_URL = "https://api.barnyard.site/auth/login?return_to=";
+  var forgetArmed = null;
+
+  function ago(ms) {
+    if (!ms) return "";
+    var min = Math.round((Date.now() - ms) / 60000);
+    if (min < 1) return "just now";
+    if (min < 60) return min + " min ago";
+    var hr = Math.round(min / 60);
+    if (hr < 24) return hr + (hr === 1 ? " hour ago" : " hours ago");
+    var d = Math.round(hr / 24);
+    return d + (d === 1 ? " day ago" : " days ago");
+  }
+
+  function renderSyncNote() {
+    var note = els.syncNote, sync = Theme.sync;
+    if (!note) return;
+    clear(note);
+    var status = sync ? sync.status() : "off";
+    if (status === "signed-out") {
+      note.appendChild(document.createTextNode("Saved in this browser only. "));
+      var a = h("a", null, "Sign in");
+      a.href = LOGIN_URL + encodeURIComponent(location.href);
+      note.appendChild(a);
+      note.appendChild(document.createTextNode(" to keep your look on every browser."));
+      return;
+    }
+    var text = {
+      off: "Saved in this browser. Look and feel follows you across the sites.",
+      checking: "Checking your profile…",
+      unsaved: "Signed in. Your next change is saved to your profile.",
+      saving: "Saving to your profile…",
+      retrying: "Can't reach your profile right now. Retrying…",
+      error: "Couldn't save to your profile. This browser keeps your changes."
+    }[status];
+    if (status === "saved") text = "Saved to your profile" + (sync.syncedAt() ? ", " + ago(sync.syncedAt()) : "") + ". ";
+    note.appendChild(document.createTextNode(text || ""));
+    if (status === "saved") {
+      var b = h("button", "link-btn", forgetArmed ? "Click again to remove" : "Remove saved profile");
+      b.type = "button";
+      b.addEventListener("click", function () {
+        if (!forgetArmed) {
+          forgetArmed = setTimeout(function () { forgetArmed = null; renderSyncNote(); }, 4000);
+          renderSyncNote();
+          return;
+        }
+        clearTimeout(forgetArmed); forgetArmed = null;
+        sync.forget().then(function (ok) { toast(ok ? "Saved profile removed. This browser keeps its look." : "Couldn't remove it. Try again."); });
+      });
+      note.appendChild(b);
+    }
+  }
+
+  if (Theme.sync) {
+    Theme.sync.onStatus(renderSyncNote);
+    // A saved profile replaced this browser's look: say so, and offer the way back.
+    Theme.sync.onAdopt(function (info) {
+      if (info.first) {
+        toast("Loaded your saved look.", { label: "Keep this browser's", ms: 10000, run: function () { Theme.set(info.previous); renderSettings(true); } });
+      } else {
+        toast("Updated from your other browser.");
+      }
+      if (settingsOpen) renderSettings(true);
+    });
+  }
+
   // ---- Settings panel ------------------------------------------------------
 
   var settingsOpen = false, activeTab = "appearance", opener = null;
@@ -323,7 +395,10 @@
     reset.type = "button";
     reset.addEventListener("click", function () { Theme.reset(); renderSettings(); toast("Settings reset to defaults"); });
     foot.appendChild(reset);
-    foot.appendChild(h("span", null, "Saved in this browser. Look and feel follows you across the sites."));
+    els.syncNote = h("span", "sync-note");
+    els.syncNote.setAttribute("role", "status");
+    foot.appendChild(els.syncNote);
+    renderSyncNote();
     panel.appendChild(head);
     panel.appendChild(els.tabs);
     panel.appendChild(els.body);
