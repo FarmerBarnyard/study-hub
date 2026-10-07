@@ -187,6 +187,13 @@
     var host = root.location && root.location.hostname;
     return typeof host === "string" && (host === "barnyard.site" || /\.barnyard\.site$/.test(host));
   }
+  // Stocks is not a login origin (its generated pages carry no CSP, so the Worker
+  // refuses cookie-bearing calls from it): it keeps the cookie-based theme only, and
+  // never calls the profile or session routes.
+  function mayUseAccount() {
+    var host = root.location && root.location.hostname;
+    return onBarnyardSite() && !/^stocks\./.test(host);
+  }
   function readCookie() {
     try {
       var m = root.document.cookie.match(new RegExp("(?:^|; )" + COOKIE_NAME + "=([^;]*)"));
@@ -309,7 +316,7 @@
   var syncListeners = [], adoptListeners = [];
   var syncStarted = false, applyingRemote = false, pushing = false, pushAgain = false, pushTimer = null, retryTimer = null, retries = 0, lastCheck = 0, syncedAt = 0;
 
-  function syncEnabled() { return onBarnyardSite() && typeof root.fetch === "function"; }
+  function syncEnabled() { return mayUseAccount() && typeof root.fetch === "function"; }
   function saveSyncState() { try { root.localStorage.setItem(SYNC_KEY, JSON.stringify(syncState)); } catch (e) { /* kept for this page view */ } }
   function setSyncStatus(next) {
     syncStatus = next;
@@ -364,6 +371,8 @@
         setSyncStatus("saved");
       } else if (r.status === 401) setSyncStatus("signed-out");
       else if (r.status === 400 || r.status === 413) setSyncStatus("error");
+      // The day's quota of saves is used up: retrying cannot help and only burns more of it.
+      else if (r.status === 429 && r.json && r.json.error === "daily_limit") setSyncStatus("error");
       else { setSyncStatus("retrying"); scheduleRetry(); }
     }, function () { setSyncStatus("retrying"); scheduleRetry(); }).then(function () {
       pushing = false;
@@ -468,7 +477,7 @@
   }
 
   function loadWho() {
-    if (!onBarnyardSite() || typeof root.fetch !== "function" || whoLoading) return;
+    if (!mayUseAccount() || typeof root.fetch !== "function" || whoLoading) return;
     var cached = readWhoCache();
     if (cached) { setWho(cached); return; }
     whoLoading = true;
