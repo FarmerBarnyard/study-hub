@@ -420,6 +420,77 @@
     }
   }
 
+  // ---- who is signed in (so a page can hide what someone cannot use) --------------
+  //
+  // GET api.barnyard.site/auth/session says whether someone is signed in, whether
+  // they are the hub owner, and which apps their groups allow. The pages use it
+  // only to hide links and widgets that would be dead ends or that show the owner's
+  // personal data (the calendar, shortcuts); every route still enforces its own
+  // group check, so this is presentation, not security. It fails open: if the
+  // session is unknown (signed out, an old Worker, a network error) nothing is hidden.
+  //
+  //   who = { authenticated: true, owner: true|false|null, apps: ["hub","campaign"]|null }
+  //       | { authenticated: false }
+  // `owner` is null until the Worker knows who the owner is. A signed-in result is
+  // kept in sessionStorage for a minute so moving between pages does not refetch.
+
+  var SESSION_URL = "https://api.barnyard.site/auth/session";
+  var SESSION_KEY = "barnyard-session";
+  var SESSION_TTL_MS = 60000;
+  var who = null, whoListeners = [], whoLoading = false;
+
+  function cleanSession(j) {
+    if (!j || j.authenticated !== true) return { authenticated: false };
+    var apps = null;
+    if (Array.isArray(j.apps)) apps = j.apps.filter(function (a) { return typeof a === "string" && a.length <= 20; }).slice(0, 10);
+    return { authenticated: true, owner: j.owner === true ? true : j.owner === false ? false : null, apps: apps };
+  }
+
+  // May this person use `app` ("study", "campaign")? Anything unknown is allowed.
+  function sessionAllows(session, app) {
+    if (!app || !session || !session.authenticated || session.owner === true) return true;
+    return !Array.isArray(session.apps) || session.apps.indexOf(app) !== -1;
+  }
+
+  // Is this a signed-in person who is definitely not the hub owner?
+  function isGuest(session) { return !!session && session.authenticated === true && session.owner === false; }
+
+  function readWhoCache() {
+    try {
+      var c = JSON.parse(root.sessionStorage.getItem(SESSION_KEY));
+      if (c && typeof c.t === "number" && Date.now() - c.t < SESSION_TTL_MS && c.data) return cleanSession(c.data);
+    } catch (e) { /* no cache */ }
+    return null;
+  }
+  function setWho(next) {
+    who = next;
+    for (var i = 0; i < whoListeners.length; i++) { try { whoListeners[i](who); } catch (e) { /* one listener must not stop the rest */ } }
+  }
+
+  function loadWho() {
+    if (!onBarnyardSite() || typeof root.fetch !== "function" || whoLoading) return;
+    var cached = readWhoCache();
+    if (cached) { setWho(cached); return; }
+    whoLoading = true;
+    root.fetch(SESSION_URL, { credentials: "include", referrerPolicy: "no-referrer" }).then(function (res) {
+      if (res.status === 401) return { authenticated: false };
+      if (!res.ok) return null;
+      return res.json().then(cleanSession, function () { return null; });
+    }).then(function (data) {
+      whoLoading = false;
+      if (!data) return;
+      if (data.authenticated) { try { root.sessionStorage.setItem(SESSION_KEY, JSON.stringify({ t: Date.now(), data: data })); } catch (e) { /* no cache */ } }
+      setWho(data);
+    }, function () { whoLoading = false; });
+  }
+
+  var whoApi = {
+    load: loadWho, allows: sessionAllows, isGuest: isGuest, clean: cleanSession,
+    get: function () { return who; },
+    // fn(session) now if it is already known, and again whenever it changes.
+    onChange: function (fn) { whoListeners.push(fn); if (who) { try { fn(who); } catch (e) { /* ignore */ } } }
+  };
+
   var sync = {
     start: startSync, pull: pull, forget: forgetProfile, decide: decideSync,
     flush: function () { return push(); },
@@ -437,14 +508,17 @@
     load: load, set: set, reset: reset, apply: apply,
     get: function () { return current; },
     onChange: function (fn) { listeners.push(fn); },
-    sync: sync
+    sync: sync,
+    who: whoApi
   };
 
   root.BarnyardTheme = api;
   if (root.document && root.document.documentElement) {
     load();
     // Start the profile sync once the page has had its first paint.
-    var startLater = function () { root.setTimeout(startSync, 300); };
+    // Who is signed in is asked at once (a hidden link should not flash first);
+    // the profile sync waits a moment so it never competes with the first paint.
+    var startLater = function () { loadWho(); root.setTimeout(startSync, 300); };
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", startLater); else startLater();
     if (root.matchMedia) {
       try { root.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (current.mode === "system") { apply(current); notify(); } }); } catch (e) { /* older browsers: the next load picks it up */ }

@@ -42,8 +42,10 @@
   var PAGES = [
     { id: "overview", title: "Overview", group: "", icon: "home", path: "", local: "./" },
     { id: "ops", title: "Ops board", group: "Work", icon: "board", path: "ops.html", local: "ops.html" },
-    { id: "study", title: "Study", group: "Sites", icon: "book", url: "https://study.barnyard.site/" },
-    { id: "campaign", title: "Campaign", group: "Sites", icon: "map", url: "https://campaign.barnyard.site/" },
+    // `app` is the group-backed app a link needs; a signed-in person whose groups
+    // do not include it does not see the link (see Theme.who in themes.js).
+    { id: "study", title: "Study", group: "Sites", icon: "book", url: "https://study.barnyard.site/", app: "study" },
+    { id: "campaign", title: "Campaign", group: "Sites", icon: "map", url: "https://campaign.barnyard.site/", app: "campaign" },
     { id: "stocks", title: "Stocks", group: "Sites", icon: "chart", url: "https://stocks.barnyard.site/" }
   ];
 
@@ -104,6 +106,14 @@
 
   // ---- build ---------------------------------------------------------------
 
+  // Which pages this person can use (Theme.who is filled in a moment after load;
+  // until it is known, and whenever it cannot be known, every link shows).
+  var navLinks = {};
+  function pageAllowed(p) { return !Theme.who || Theme.who.allows(Theme.who.get(), p.app); }
+  function applyWho() {
+    PAGES.forEach(function (p) { if (navLinks[p.id]) navLinks[p.id].hidden = !pageAllowed(p); });
+  }
+
   function build() {
     if (!document.getElementById("bg")) {
       var bg = h("div", "bg bgx-" + Theme.get().bg);
@@ -150,6 +160,7 @@
       if (p.id === "ops") { els.badge = h("span", "badge", "0"); els.badge.hidden = true; a.appendChild(els.badge); }
       var abs = new URL(a.href, location.href);
       if (abs.origin !== location.origin) a.appendChild(svg("ext", "ext"));
+      if (p.app) navLinks[p.id] = a;
       nav.appendChild(a);
     });
     side.appendChild(nav);
@@ -193,6 +204,7 @@
     buildSettingsShell();
     syncModeButton();
     Theme.onChange(function () { els.bg.className = "bg bgx-" + Theme.get().bg; syncModeButton(); if (settingsOpen) renderSettings(true); });
+    if (Theme.who) Theme.who.onChange(applyWho);
   }
 
   function syncModeButton() {
@@ -239,7 +251,7 @@
       clear(box);
       idx = -1;
       if (!q) { close(); return; }
-      var pages = PAGES.filter(function (p) { return p.title.toLowerCase().indexOf(q) !== -1; });
+      var pages = PAGES.filter(function (p) { return pageAllowed(p) && p.title.toLowerCase().indexOf(q) !== -1; });
       var found = [];
       if (searchSource) {
         try { found = searchSource().filter(function (x) { return x.title.toLowerCase().indexOf(q) !== -1; }).slice(0, 6); } catch (e) { found = []; }
