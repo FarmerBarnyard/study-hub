@@ -5,44 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.barnyard.site; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'self'; form-action 'none';">
 <title>Study &mdash; Barnyard</title>
+<link rel="stylesheet" href="shell.css">
 <link rel="stylesheet" href="style.css">
+<script src="themes.js"></script>
 </head>
-<body>
+<body data-shell="study">
 
-<header class="study-header">
-  <div class="study-header-main">
-    <h1 class="wordmark">Study</h1>
-    <p class="tagline">Certifications in progress, and the notes that go with them.</p>
-    <a class="back-link" href="https://dashboard.barnyard.site/">&larr; Back to Barnyard</a>
+<main id="page" class="content">
+
+  <div class="page-head">
+    <div>
+      <h1>Study</h1>
+      <p>Certifications in progress, and the notes that go with them.</p>
+    </div>
+    <p class="generated-note" id="generated-note"></p>
   </div>
-  <div class="auth-status" id="auth-status"></div>
-</header>
 
-<noscript>
-  <p class="cert-empty-note">This page needs JavaScript to load the certification list. You can browse the underlying Notion pages directly instead, or view this repo on <a href="https://github.com/FarmerBarnyard/study-hub">GitHub</a>.</p>
-</noscript>
+  <noscript>
+    <p class="cert-empty-note">This page needs JavaScript to load the certification list. You can browse the underlying Notion pages directly instead, or view this repo on <a href="https://github.com/FarmerBarnyard/study-hub">GitHub</a>.</p>
+  </noscript>
 
-<main id="main-content">
+  <div id="main-content">
 
-  <p class="generated-note" id="generated-note"></p>
-  <p class="cert-empty-note" id="loading-note">Loading certifications&hellip;</p>
+    <p class="cert-empty-note" id="loading-note">Loading certifications&hellip;</p>
 
-  <section class="cert-section" aria-labelledby="ongoing-heading">
-    <h2 class="section-heading" id="ongoing-heading">Ongoing</h2>
-    <ul class="cert-list" id="ongoing-list" role="list"></ul>
-  </section>
+    <section class="cert-section" aria-labelledby="ongoing-heading">
+      <h2 class="section-heading" id="ongoing-heading">Ongoing</h2>
+      <ul class="cert-list" id="ongoing-list" role="list"></ul>
+    </section>
 
-  <section class="cert-section" aria-labelledby="completed-heading">
-    <h2 class="section-heading" id="completed-heading">Completed</h2>
-    <ul class="cert-list completed" id="completed-list" role="list"></ul>
-  </section>
+    <section class="cert-section" aria-labelledby="completed-heading">
+      <h2 class="section-heading" id="completed-heading">Completed</h2>
+      <ul class="cert-list completed" id="completed-list" role="list"></ul>
+    </section>
+
+  </div>
+
+  <p class="dim study-footer">Study hub &mdash; a static page with no third-party tracking. The certification list and pre-authored revision notes are a snapshot, refreshed periodically from Notion by a separate process (see the repo's README) and committed here. The one exception is the &ldquo;Generate revision notes&rdquo; button: clicking it calls a Cloudflare Worker that reads the certification's Notion page and asks Claude to summarize it on your behalf, and caches the result only in this browser. Your theme and layout choices are saved in this browser; your theme, background and density are also kept in a small cookie shared by the barnyard.site pages, so they match everywhere.</p>
 
 </main>
 
-<footer class="study-footer">
-  Study hub &mdash; static landing page, no account needed to browse, no third-party tracking. The certification list and pre-authored revision notes are a static snapshot, refreshed periodically from Notion by a separate process (see the repo's README) and committed here. The one exception is the "Generate revision notes" button: clicking it calls a Cloudflare Worker that reads the certification's Notion page and asks Claude to summarize it on your behalf, and caches the result only in this browser.
-</footer>
-
+<script src="shell.js"></script>
 <script src="auth-gate.js"></script>
 <script src="app.js"></script>
 </body>
