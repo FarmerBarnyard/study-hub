@@ -187,3 +187,12 @@
   .kb-body { max-width: none; font-size: 11pt; }
 }
 .kb-danger { color: var(--alert); }
+
+/* the passage-by-passage rewrite: progress while the model works */
+.kb-airun { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent-soft); }
+.kb-airun[hidden] { display: none; }
+.kb-airun-text { flex: 1 1 260px; font-size: 13px; color: var(--fg-strong); }
+.kb-ai-progress { flex: 1 1 160px; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.kb-ai-progress-fill { height: 100%; background: var(--accent); transform-origin: left center; transform: scaleX(0); transition: transform .3s ease; }
+.kb-body-text[readonly] { opacity: .75; }
+@media (prefers-reduced-motion: reduce) { .kb-ai-progress-fill { transition: none; } }

@@ -259,10 +259,116 @@
     return block + String(body).replace(/^> \[!TIP\]\n> \*\*Key points\*\*\n(?:>.*\n?)*\n*/, "");
   }
 
+  // ---- rewriting an article one passage at a time with the site's model ----------------------
+  //
+  // The model is slow, so the article is cut into units of about 90 words and each prose unit
+  // is sent on its own (see kb-logic.js on the Worker). Headings, code blocks, tables, quotes,
+  // pictures, link cards and short lines are never sent; inline code, links and images inside
+  // a sent unit are swapped for markers (⟦1⟧ ...) that must come back exactly once each, so
+  // the model cannot change a command or an address. A rewrite that fails any check is
+  // dropped and the author's own words stay.
+
+  var AI_CHUNK_WORDS = 90;
+  var AI_MIN_WORDS = 12;
+
+  // The article as units: { text, ai, heading, sep }. Joining text + sep rebuilds it.
+  function splitForAi(body, maxWords) {
+    var limit = maxWords || AI_CHUNK_WORDS;
+    var blocks = [], cur = [], fence = null;
+    function flush() { if (cur.length) { blocks.push(cur.join("\n")); cur = []; } }
+    lines(body).forEach(function (line) {
+      var m = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
+      if (fence === null) {
+        if (m) { flush(); fence = m[1].charAt(0); cur.push(line); return; }
+        if (!line.trim()) { flush(); return; }
+        if (headingLevel(line)) { flush(); blocks.push(line); return; }
+        cur.push(line);
+      } else {
+        cur.push(line);
+        if (m && m[1].charAt(0) === fence) { fence = null; flush(); }
+      }
+    });
+    flush();
+
+    var units = [], heading = "";
+    blocks.forEach(function (b) {
+      var first = b.split("\n")[0];
+      if (headingLevel(first) && b.indexOf("\n") === -1) { heading = plain(first.replace(/^#{1,6}\s+/, "")); units.push({ text: b, ai: false, heading: heading, sep: "\n\n" }); return; }
+      var rewritable = !/^\s{0,3}(`{3,}|~{3,})/.test(first) && !/^\|/.test(first) && !/^>/.test(first) && !/^(-{3,}|\*{3,}|_{3,})\s*$/.test(first) &&
+        !b.split("\n").every(function (l) { return /^!\[[^\]]*\]\([^)]*\)\s*$/.test(l.trim()) || /^(\[[^\]]+\]\()?https?:\/\/\S+\)?$/.test(l.trim()); }) &&
+        words(b) >= AI_MIN_WORDS;
+      if (!rewritable) { units.push({ text: b, ai: false, heading: heading, sep: "\n\n" }); return; }
+      var isList = b.split("\n").some(function (l) { return /^\s*(?:[-*+]|\d+[.)])\s/.test(l); });
+      var parts = [];
+      if (words(b) <= limit) parts = [b];
+      else if (isList) {
+        var acc = [], n = 0;
+        b.split("\n").forEach(function (l) {
+          var w = words(l);
+          if (acc.length && n + w > limit) { parts.push(acc.join("\n")); acc = []; n = 0; }
+          acc.push(l); n += w;
+        });
+        if (acc.length) parts.push(acc.join("\n"));
+      } else {
+        var sentences = b.replace(/\n/g, " ").match(/[^.!?]+[.!?]+["')\]]*\s*|[^.!?]+$/g) || [b];
+        var cur2 = "", n2 = 0;
+        sentences.forEach(function (s) {
+          var w = words(s);
+          if (cur2 && n2 + w > limit) { parts.push(cur2.trim()); cur2 = ""; n2 = 0; }
+          cur2 += s; n2 += w;
+        });
+        if (cur2.trim()) parts.push(cur2.trim());
+      }
+      parts.forEach(function (p, i) {
+        units.push({ text: p, ai: true, heading: heading, sep: i === parts.length - 1 ? "\n\n" : (isList ? "\n" : " ") });
+      });
+    });
+    return units;
+  }
+
+  function joinUnits(units) {
+    var s = units.map(function (u) { return u.text + u.sep; }).join("").replace(/\s+$/, "");
+    return s ? s + "\n" : "";
+  }
+
+  var PROTECT = /!\[[^\]]*\]\([^)]*\)|\[\[[^\]\n]+\]\]|\[[^\]\n]*\]\([^)\n]*\)|`[^`\n]+`|https?:\/\/[^\s)]+/g;
+
+  // -> { text, tokens }: inline code, links, images and addresses replaced by ⟦n⟧.
+  function protect(text) {
+    var tokens = [];
+    var out = String(text).replace(PROTECT, function (m) { tokens.push(m); return "⟦" + tokens.length + "⟧"; });
+    return { text: out, tokens: tokens };
+  }
+
+  // Puts the tokens back; null if any marker is missing, repeated or invented.
+  function restore(text, tokens) {
+    var s = String(text);
+    for (var i = 0; i < tokens.length; i++) {
+      var mark = "⟦" + (i + 1) + "⟧";
+      if (s.split(mark).length !== 2) return null;
+    }
+    var seen = s.match(/⟦\d+⟧/g) || [];
+    if (seen.length !== tokens.length) return null;
+    return s.replace(/⟦(\d+)⟧/g, function (m, n) { return tokens[Number(n) - 1]; });
+  }
+
+  // Is this restored rewrite plausibly the same passage? Not much shorter or longer, no
+  // headings or code fences added, nothing left of the markers.
+  function acceptRewrite(original, rewritten) {
+    if (typeof rewritten !== "string" || !rewritten.trim()) return false;
+    if (/⟦|⟧/.test(rewritten)) return false;
+    if (/^\s{0,3}(#{1,6}\s|`{3,}|~{3,})/m.test(rewritten)) return false;
+    var a = words(protect(original).text), b = words(protect(rewritten).text);
+    if (!a || b < a * 0.4 || b > a * 1.7) return false;
+    return true;
+  }
+
   var api = {
     draftFromNotes: draftFromNotes, cleanBody: cleanBody, stripLeadingTitle: stripLeadingTitle, shiftHeadings: shiftHeadings,
     flattenLinks: flattenLinks, firstParagraph: firstParagraph, summaryOf: summaryOf, headingsOf: headingsOf, headingId: headingId,
     withKeyPoints: withKeyPoints, countOf: countOf, plain: plain,
+    splitForAi: splitForAi, joinUnits: joinUnits, protect: protect, restore: restore, acceptRewrite: acceptRewrite,
+    AI_CHUNK_WORDS: AI_CHUNK_WORDS,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.BarnyardKbFormat = api;

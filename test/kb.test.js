@@ -15,8 +15,11 @@ test("addresses map to views, and anything odd falls back to the library", funct
   assert.deepStrictEqual(k.parseRoute("#/edit/ka_abcd1234"), { view: "edit", id: "ka_abcd1234" });
   assert.deepStrictEqual(k.parseRoute("#/a/../x"), { view: "library" });
   assert.deepStrictEqual(k.parseRoute("#/a/KA_ABCD1234"), { view: "library" });
-  assert.deepStrictEqual(k.parseRoute("#/new"), { view: "new", notes: [] });
-  assert.deepStrictEqual(k.parseRoute("#/new?note=nt_aaaaaaa1&note=nt_aaaaaaa2&note=nt_aaaaaaa1&note=bad&x=1"), { view: "new", notes: ["nt_aaaaaaa1", "nt_aaaaaaa2"] });
+  assert.deepStrictEqual(k.parseRoute("#/new"), { view: "new", notes: [], ai: false });
+  assert.deepStrictEqual(k.parseRoute("#/new?note=nt_aaaaaaa1&note=nt_aaaaaaa2&note=nt_aaaaaaa1&note=bad&x=1"), { view: "new", notes: ["nt_aaaaaaa1", "nt_aaaaaaa2"], ai: false });
+  assert.deepStrictEqual(k.parseRoute("#/new?note=nt_aaaaaaa1&ai=1"), { view: "new", notes: ["nt_aaaaaaa1"], ai: true });
+  assert.strictEqual(k.parseRoute("#/new?note=nt_aaaaaaa1&ai=11").ai, false);
+  assert.strictEqual(k.parseRoute("#/new?note=nt_aaaaaaa1&bai=1").ai, false);
   assert.strictEqual(k.parseRoute("#/new?" + Array.from({ length: 30 }, function (_, i) { return "note=nt_aaaaaa" + (10 + i); }).join("&")).notes.length, 12);
 });
 
