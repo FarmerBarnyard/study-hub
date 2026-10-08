@@ -39,7 +39,7 @@
         var p = kv.split("=");
         if (p[0] === "note" && NOTE_ID.test(p[1] || "") && notes.indexOf(p[1]) === -1 && notes.length < 12) notes.push(p[1]);
       });
-      return { view: "new", notes: notes };
+      return { view: "new", notes: notes, ai: /(^|&)ai=1(&|$)/.test(q) };
     }
     return { view: "library" };
   }
@@ -591,14 +591,18 @@
     });
   }
 
-  function startNew(preselect) {
+  // `ai` (from "Generate KB article (AI)" on a note): skip choosing, build the draft from the
+  // chosen note(s) and start the passage-by-passage rewrite as soon as the editor opens.
+  function startNew(preselect, ai) {
     dropObservers(); dropScroll();
-    comp = { mode: "new", step: "pick", picked: (preselect || []).slice(), q: "", notebook: null, draft: null, dirty: false, title: "", report: null, aiUsed: false };
+    comp = { mode: "new", step: "pick", picked: (preselect || []).slice(), q: "", notebook: null, draft: null, dirty: false, title: "", report: null, autoAi: false };
     setTitle("New article");
     var view = $("kb-view");
     clear(view);
     el("p", "kb-loading", view, "Reading your notebook…");
-    Promise.all([loadNotebook(), state.loaded ? true : loadLibrary()]).then(function () { renderPick(); });
+    Promise.all([loadNotebook(), state.loaded ? true : loadLibrary()]).then(function () {
+      if (ai && comp.picked.length && comp.notebook) { comp.autoAi = true; generate(null); } else renderPick();
+    });
   }
 
   function renderPick() {
@@ -672,8 +676,7 @@
   }
 
   function generate(button) {
-    button.disabled = true;
-    button.textContent = "Reading your notes…";
+    if (button) { button.disabled = true; button.textContent = "Reading your notes…"; }
     var notes = [];
     var chain = Promise.resolve();
     comp.picked.forEach(function (id) {
@@ -694,8 +697,8 @@
       comp.dirty = true;
       renderEditor();
     }, function () {
-      button.disabled = false;
-      button.textContent = "Generate article";
+      if (button) { button.disabled = false; button.textContent = "Generate article"; }
+      else { comp.autoAi = false; renderPick(); }
       toast("Could not read one of the notes. Try again.");
     });
   }
@@ -763,8 +766,16 @@
     var sumLabel = field("Summary", summary);
     var count = el("span", "kb-hint kb-count-hint", sumLabel);
     var aiRow = el("div", "kb-airow", form);
+    var aiRewrite = btn("Rewrite with AI, passage by passage", "btn", aiRow);
     var ai = btn("Add an AI summary and key points", "btn", aiRow);
     var aiNote = el("span", "kb-hint", aiRow);
+    var aiRun = el("div", "kb-airun", form);
+    aiRun.hidden = true;
+    var aiRunText = el("span", "kb-airun-text", aiRun);
+    aiRunText.setAttribute("role", "status");
+    var aiBar = el("div", "kb-ai-progress", aiRun);
+    var aiFill = el("div", "kb-ai-progress-fill", aiBar);
+    var aiStop = btn("Stop", "btn", aiRun);
     var tags = el("input", "kb-input");
     tags.type = "text"; tags.value = d.tags.join(", "); tags.autocomplete = "off"; tags.placeholder = "azure, identity";
     field("Tags", tags, "Separate with commas (up to 8). The first one is shown on the card.");
@@ -853,7 +864,7 @@
       d.title = title.value; d.summary = summary.value; d.tags = parseTags(tags.value); d.body = text.value;
       comp.dirty = true;
       updateCount();
-      if (comp.pubBtn) comp.pubBtn.disabled = !d.title.trim() || !d.body.trim();
+      if (comp.pubBtn) comp.pubBtn.disabled = running || !d.title.trim() || !d.body.trim();
     }
     [title, summary, tags].forEach(function (n) { n.addEventListener("input", onChange); });
     text.addEventListener("input", function () {
@@ -863,29 +874,127 @@
     });
     updateCount();
 
-    // The optional summary from the site's own model.
+    // The optional help from the site's own model. Nothing here runs unless a button is
+    // pressed, and the text goes only to the site's own model, not to an outside service.
     var meAi = state.me && state.me.ai;
+    var running = false, stopRequested = false;
+    aiRewrite.disabled = !meAi;
     ai.disabled = !meAi;
-    aiNote.textContent = meAi ? "Sent to this site’s own model, not an outside service. It can take a minute or two." : "The site’s AI model is not connected, so you can write the summary yourself.";
+    aiNote.textContent = meAi
+      ? "Sent to this site’s own model, not an outside service. Rewriting takes about a minute for every paragraph; you can stop at any time."
+      : "The site’s AI model is not connected, so you can write the summary yourself.";
+
+    function setBusy(on) {
+      running = on;
+      aiRewrite.disabled = on || !meAi;
+      ai.disabled = on || !meAi;
+      text.readOnly = on;
+      if (comp.pubBtn) comp.pubBtn.disabled = on || !d.title.trim() || !d.body.trim();
+      aiRun.hidden = !on;
+    }
+    function refreshAll() { summary.value = d.summary; text.value = d.body; updateCount(); drawPreview(); drawSide(); if (running && comp.pubBtn) comp.pubBtn.disabled = true; }
+
+    function runSummary(done) {
+      aiNote.textContent = "Asking the model for a summary… this can take a minute or two.";
+      kb("POST", "/ai-summary", { title: d.title, body: d.body }).then(function (r) {
+        if (r.status !== 200) { aiNote.textContent = describeError(r.status, r.json); if (done) done(false); return; }
+        d.summary = r.json.summary;
+        d.body = fmt.withKeyPoints(d.body, r.json.takeaways);
+        comp.dirty = true;
+        refreshAll();
+        aiNote.textContent = "Summary and key points added (" + r.json.left + " summaries left today). Check they read right.";
+        if (done) done(true);
+      });
+    }
     ai.addEventListener("click", function () {
       onChange();
       if (!d.body.trim()) return;
-      ai.disabled = true;
-      aiNote.textContent = "Asking the model… please wait, this can take a minute or two.";
-      kb("POST", "/ai-summary", { title: d.title, body: d.body }).then(function (r) {
-        ai.disabled = false;
-        if (r.status !== 200) { aiNote.textContent = describeError(r.status, r.json); return; }
-        d.summary = r.json.summary;
-        d.body = fmt.withKeyPoints(d.body, r.json.takeaways);
-        summary.value = d.summary; text.value = d.body;
-        comp.dirty = true;
-        updateCount(); drawPreview(); drawSide();
-        aiNote.textContent = "Added. Check it reads right and edit anything you like (" + r.json.left + " left today).";
-      });
+      setBusy(true);
+      aiRunText.textContent = "Asking the model for a summary…";
+      aiFill.style.transform = "scaleX(0.05)";
+      aiStop.hidden = true;
+      runSummary(function () { aiStop.hidden = false; setBusy(false); });
     });
+
+    // Rewrite the article one passage at a time. Each prose passage (about 90 words) is a
+    // separate request so none runs longer than the model's time limit; headings, code,
+    // tables, pictures and short lines stay exactly as written, and a rewrite that fails
+    // any check is dropped (the author's own words stay).
+    function startRewrite(alsoSummary) {
+      onChange();
+      if (running || !d.body.trim()) return;
+      var units = fmt.splitForAi(d.body);
+      var todo = [];
+      units.forEach(function (u, i) { if (u.ai) todo.push(i); });
+      if (!todo.length) { aiNote.textContent = "Nothing to rewrite here: it is all headings, code, tables, pictures or short lines."; if (alsoSummary) runSummary(); return; }
+      var done = 0, kept = 0, fails = 0, at = 0, started = Date.now(), halted = "";
+      stopRequested = false;
+      aiStop.hidden = false;
+      setBusy(true);
+      function eta() {
+        var left = todo.length - at;
+        var per = at > 0 ? (Date.now() - started) / at : 60000;
+        var mins = Math.max(1, Math.round((left * per) / 60000));
+        return "about " + mins + (mins === 1 ? " minute" : " minutes") + " left";
+      }
+      function paint() {
+        aiRunText.textContent = at >= todo.length ? "Finishing…" : "Rewriting passage " + (at + 1) + " of " + todo.length + " (" + eta() + "). Stop at any time.";
+        aiFill.style.transform = "scaleX(" + (todo.length ? at / todo.length : 1).toFixed(3) + ")";
+      }
+      function finish() {
+        d.body = fmt.joinUnits(units);
+        comp.dirty = true;
+        function after() {
+          setBusy(false);
+          var msg = (halted ? halted + " " : "") + "Rewrote " + done + " of " + todo.length + " passages" + (kept ? "; " + kept + " kept as you wrote them" : "") + ". Read it through before publishing.";
+          aiNote.textContent = msg;
+          refreshAll();
+        }
+        refreshAll();
+        if (alsoSummary && !stopRequested && !halted) {
+          aiRunText.textContent = "Writing the summary and key points…";
+          runSummary(function () { after(); });
+        } else after();
+      }
+      function step() {
+        if (stopRequested) { halted = "Stopped."; finish(); return; }
+        if (at >= todo.length) { finish(); return; }
+        paint();
+        var u = units[todo[at]];
+        var pr = fmt.protect(u.text);
+        kb("POST", "/ai-section", { heading: u.heading || d.title, text: pr.text }).then(function (r) {
+          if (r.status === 200) {
+            var back = fmt.restore(r.json.text, pr.tokens);
+            if (back !== null && fmt.acceptRewrite(u.text, back)) { u.text = back; done++; } else kept++;
+            fails = 0;
+          } else if (r.status === 429 || r.status === 401 || r.status === 403 || r.json.error === "ai_unavailable" || r.json.error === "secret_detected") {
+            halted = r.status === 429 ? "The daily AI limit was reached, so it stopped." : r.json.error === "secret_detected" ? "A passage looks like it holds a password or key, so it stopped." : describeError(r.status, r.json);
+            finish();
+            return;
+          } else {
+            kept++; fails++;
+            if (fails >= 3) { halted = "The model kept failing, so it stopped."; finish(); return; }
+          }
+          at++;
+          d.body = fmt.joinUnits(units);
+          text.value = d.body;
+          drawPreview();
+          step();
+        });
+      }
+      step();
+    }
+    aiRewrite.addEventListener("click", function () { startRewrite(true); });
+    aiStop.addEventListener("click", function () { stopRequested = true; aiRunText.textContent = "Stopping after this passage…"; });
+    comp.startRewrite = startRewrite;
 
     drawPreview();
     drawSide();
+    if (comp.autoAi) {
+      comp.autoAi = false;
+      if (meAi) startRewrite(true);
+      else aiNote.textContent = "The site’s AI model is not connected, so this draft was not rewritten. You can edit it by hand and publish.";
+    }
   }
 
   function publish(button, allowPii) {
@@ -935,7 +1044,7 @@
     }
     if (r.view !== "new" && r.view !== "edit") comp = null;
     if (r.view === "article") { openArticle(r.id); return; }
-    if (r.view === "new") { if (comp && comp.mode === "new" && comp.step === "edit") return; startNew(r.notes); return; }
+    if (r.view === "new") { if (comp && comp.mode === "new" && comp.step === "edit") return; startNew(r.notes, r.ai); return; }
     if (r.view === "edit") { if (comp && comp.mode === "edit" && comp.editId === r.id) return; startEdit(r.id); return; }
     renderLibrary();
     loadLibrary().then(function (ok) {

@@ -116,4 +116,89 @@ test("a to-do list is not mistaken for prose and its boxes are dropped from the 
   assert.strictEqual(f.summaryOf("- [ ] Revise the identity governance chapter before the exam\n- [x] done"), "Revise the identity governance chapter before the exam");
 });
 
+// ---- rewriting passage by passage ------------------------------------------------------------
+
+function wordsIn(s) { return (s.match(/[A-Za-z0-9']+/g) || []).length; }
+var PARA = "Entra ID is the identity service for Microsoft cloud apps, and it holds users, groups and devices for a tenant. ";
+var ARTICLE = [
+  "## Overview", PARA.repeat(2).trim(),
+  "```powershell\nGet-MgUser -All\n\nGet-MgGroup\n```",
+  "| a | b |\n|---|---|\n| 1 | 2 |",
+  "![shot](img:im_abcd1234)",
+  "https://learn.microsoft.com/en-us/entra/",
+  "> [!TIP]\n> **Key points**\n> - one two three four five six seven eight nine ten eleven twelve",
+  "Short line here.",
+  "## Roles",
+  "- Global administrator can manage every setting in the tenant and assign other roles\n- User administrator can create and manage users and groups but not reset every admin password\n- Helpdesk administrator can reset passwords for non-administrators and invalidate refresh tokens for them\n- Billing administrator can make purchases and manage subscriptions and support tickets for the organisation\n- Security administrator can read security reports and manage policies for sign-in risk and conditional access across the tenant\n- Reports reader can view sign-in reports and usage reports but cannot change any setting or any user in the directory",
+].join("\n\n") + "\n";
+
+test("an article is split into units that join back to exactly the same text", function () {
+  var units = f.splitForAi(ARTICLE);
+  assert.strictEqual(f.joinUnits(units), ARTICLE);
+  assert.strictEqual(f.joinUnits(f.splitForAi("")), "");
+});
+
+test("only prose is marked for rewriting: headings, code, tables, pictures, cards, quotes and short lines are kept", function () {
+  var units = f.splitForAi(ARTICLE);
+  units.filter(function (u) { return !u.ai; }).forEach(function (u) {
+    assert.ok(/^(#|```|\||!\[|https:|>|Short)/.test(u.text), "kept as written: " + u.text.slice(0, 30));
+  });
+  units.filter(function (u) { return u.ai; }).forEach(function (u) {
+    assert.ok(!/^(#|```|\||!\[|>)/.test(u.text));
+    assert.ok(wordsIn(u.text) <= 90 + 20, "a unit is at most about 90 words: " + wordsIn(u.text));
+  });
+  assert.ok(units.some(function (u) { return u.ai; }));
+});
+
+test("long paragraphs split at sentences and long lists between items, each unit knowing its heading", function () {
+  var para = f.splitForAi("## Intro\n\n" + PARA.repeat(12).trim() + "\n");
+  var ai = para.filter(function (u) { return u.ai; });
+  assert.ok(ai.length >= 2, "a 200-word paragraph becomes several units");
+  ai.forEach(function (u) { assert.strictEqual(u.heading, "Intro"); assert.ok(/[.]$/.test(u.text), "cut at a sentence end"); });
+  assert.strictEqual(ai[0].sep, " ");
+  assert.strictEqual(ai[ai.length - 1].sep, "\n\n");
+  var roles = f.splitForAi(ARTICLE).filter(function (u) { return u.ai && u.heading === "Roles"; });
+  assert.ok(roles.length >= 2 && roles[0].sep === "\n", "a list is cut between items");
+  roles.forEach(function (u) { assert.ok(u.text.split("\n").every(function (l) { return /^- /.test(l); })); });
+});
+
+test("code, links, images, addresses and [[links]] are swapped for markers and come back exactly", function () {
+  var p = f.protect("Run `Get-MgUser -All` then see [the docs](https://e.com/x) and https://example.com/a and ![s](img:im_abcd1234) and [[Other]].");
+  assert.strictEqual(p.tokens.length, 5);
+  assert.ok(p.text.indexOf("Get-MgUser") === -1 && p.text.indexOf("example.com") === -1);
+  assert.ok(/⟦1⟧/.test(p.text));
+  assert.strictEqual(f.restore(p.text, p.tokens), "Run `Get-MgUser -All` then see [the docs](https://e.com/x) and https://example.com/a and ![s](img:im_abcd1234) and [[Other]].");
+  assert.strictEqual(f.protect("plain words").tokens.length, 0);
+});
+
+test("a rewrite that loses, repeats or invents a marker is refused", function () {
+  var tokens = ["`a`", "`b`"];
+  assert.strictEqual(f.restore("uses ⟦1⟧ and ⟦2⟧", tokens), "uses `a` and `b`");
+  assert.strictEqual(f.restore("uses ⟦1⟧ only", tokens), null, "lost");
+  assert.strictEqual(f.restore("⟦1⟧ ⟦1⟧ ⟦2⟧", tokens), null, "repeated");
+  assert.strictEqual(f.restore("⟦1⟧ ⟦2⟧ ⟦3⟧", tokens), null, "invented");
+});
+
+test("a rewrite is accepted only if it is plausibly the same passage", function () {
+  var orig = "The user administrator role can create and manage users and groups in the tenant but cannot reset passwords for every administrator account.";
+  assert.strictEqual(f.acceptRewrite(orig, "A user administrator creates and manages users and groups, though not the passwords of every administrator account in the tenant."), true);
+  assert.strictEqual(f.acceptRewrite(orig, "Admins manage users."), false, "far shorter");
+  assert.strictEqual(f.acceptRewrite(orig, orig + " " + orig + " " + orig), false, "far longer");
+  assert.strictEqual(f.acceptRewrite(orig, "## New heading\n" + orig), false, "adds a heading");
+  assert.strictEqual(f.acceptRewrite(orig, "```\n" + orig + "\n```"), false, "adds a code fence");
+  assert.strictEqual(f.acceptRewrite(orig, orig + " ⟦1⟧"), false, "a marker is left over");
+  assert.strictEqual(f.acceptRewrite(orig, ""), false);
+  assert.strictEqual(f.acceptRewrite(orig, null), false);
+});
+
+test("replacing a unit's text rebuilds an article that keeps everything else byte for byte", function () {
+  var units = f.splitForAi(ARTICLE);
+  var i = units.findIndex(function (u) { return u.ai && u.heading === "Overview"; });
+  units[i].text = "REWRITTEN overview text that stands in for the model's answer.";
+  var out = f.joinUnits(units);
+  assert.ok(out.indexOf("REWRITTEN overview") !== -1);
+  assert.ok(out.indexOf("```powershell\nGet-MgUser -All\n\nGet-MgGroup\n```") !== -1, "code with its blank line is untouched");
+  assert.ok(out.indexOf("![shot](img:im_abcd1234)") !== -1 && out.indexOf("| a | b |") !== -1);
+});
+
 console.log("\n" + passed + " passed");

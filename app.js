@@ -21,6 +21,12 @@
   var DATA_URL = "data.json";
   var FETCH_TIMEOUT_MS = 10000;
   var GENERATE_NOTES_API = "https://api.barnyard.site/generate-notes";
+  // Switched off 2026-10-08. The "Generate revision notes" button called the paid Claude
+  // API through the Worker; revision notes are now made from the study notebook with the
+  // site's own model (Notes -> "Generate KB article (AI)"). The Worker route answers 410
+  // too. Notes already generated stay readable from this browser's cache. To bring the
+  // button back, set this to true and set the Worker variable GENERATE_NOTES_ENABLED to "1".
+  var GENERATE_NOTES_ENABLED = false;
   var GENERATE_TIMEOUT_MS = 65000; // slightly past the Worker's own 60s Claude-call timeout, so the client doesn't give up first
   var NOTES_CACHE_PREFIX = "study-hub-notes:";
   var NOTES_CACHE_VERSION = 1;
@@ -315,7 +321,7 @@
 
     if (cachedNotes) showGenerated(cachedNotes.sections, cachedNotes.generatedAt);
 
-    if (certRef.slug && authState && authState.authenticated) {
+    if (GENERATE_NOTES_ENABLED && certRef.slug && authState && authState.authenticated) {
       // Cost/latency disclosure shown up front, before any click -- not
       // only inside the in-flight status message, which a first-time
       // visitor would only see after the (irreversible, billed) request is
@@ -348,7 +354,7 @@
             button.removeAttribute("aria-busy");
           });
       });
-    } else if (certRef.slug) {
+    } else if (GENERATE_NOTES_ENABLED && certRef.slug) {
       // Not logged in (or auth state couldn't be checked -- fails closed to
       // this state, same as barnyardAuthState()'s own fallback) -- show a
       // login prompt in place of an active button, rather than letting a
