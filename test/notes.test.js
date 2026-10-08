@@ -79,4 +79,44 @@ test("downloaded file names are safe", function () {
   assert.strictEqual(n.fileNameFor("..\\..\\x"), ".. .. x.md");
 });
 
+test("ticking a to-do in the preview changes the right Markdown line, skipping code", function () {
+  var text = "- [ ] one\n- [x] two\n\n```\n- [ ] not a task\n```\n\n1. [ ] three\n> - [ ] four";
+  assert.strictEqual(n.toggleTask(text, 0).split("\n")[0], "- [x] one");
+  assert.strictEqual(n.toggleTask(text, 1).split("\n")[1], "- [ ] two");
+  assert.strictEqual(n.toggleTask(text, 2).split("\n")[7], "1. [x] three", "the task inside the code fence is not counted");
+  assert.strictEqual(n.toggleTask(text, 3).split("\n")[8], "> - [x] four");
+  assert.strictEqual(n.toggleTask(text, 4), null);
+  assert.strictEqual(n.toggleTask("no tasks here", 0), null);
+});
+
+test("word count and reading time", function () {
+  assert.deepStrictEqual(n.textStats(""), { words: 0, minutes: 0 });
+  assert.strictEqual(n.textStats("one two three").words, 3);
+  assert.strictEqual(n.textStats("word ".repeat(440)).minutes, 2);
+  assert.strictEqual(n.textStats("a ```\nlots of code words here\n``` b").words, 2, "fenced code is not counted");
+});
+
+test("the breadcrumb lists the folders above an item, outermost first, and survives a loop", function () {
+  var t = n.buildTree([item("nt_00000001", "A", "folder"), item("nt_00000002", "B", "folder", "nt_00000001"), item("nt_00000003", "C", "note", "nt_00000002")]);
+  assert.deepStrictEqual(n.crumbPath(t, "nt_00000003").map(function (f) { return f.title; }), ["A", "B"]);
+  assert.deepStrictEqual(n.crumbPath(t, "nt_00000001"), []);
+  var loop = { byId: { x: { id: "x", parent: "y" }, y: { id: "y", parent: "x" } } };
+  assert.ok(n.crumbPath(loop, "x").length <= 12);
+});
+
+test("quick find: every word must match; starts-with and whole words rank first; empty query lists the newest", function () {
+  var items = [
+    { id: "a", title: "Microsoft Entra roles", kind: "note", updatedAt: 1 },
+    { id: "b", title: "Entra ID basics", kind: "note", updatedAt: 3 },
+    { id: "c", title: "Pre-Entranced", kind: "note", updatedAt: 9 },
+    { id: "d", title: "Other", kind: "note", updatedAt: 5 },
+  ];
+  // b starts with it; a and c tie (word starts with it), so the newer one (c) comes first
+  assert.deepStrictEqual(n.rankFind(items, "entra", 10).map(function (i) { return i.id; }), ["b", "c", "a"]);
+  assert.deepStrictEqual(n.rankFind(items, "entra roles", 10).map(function (i) { return i.id; }), ["a"]);
+  assert.deepStrictEqual(n.rankFind(items, "", 2).map(function (i) { return i.id; }), ["c", "d"]);
+  assert.deepStrictEqual(n.rankFind(items, "zzz", 5), []);
+  assert.strictEqual(n.rankFind(items, "(", 5).length, 0, "regular-expression characters in a query are harmless");
+});
+
 console.log("\n" + passed + " passed");
