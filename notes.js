@@ -126,9 +126,68 @@
     return (base || "note") + ".md";
   }
 
+  // Tick or untick the n-th task item ("- [ ] ..." / "- [x] ...") of a note, counting in document order
+  // and skipping fenced code. This is how clicking a checkbox in the preview changes the Markdown.
+  // -> the new text, or null when there is no such task.
+  function toggleTask(text, n) {
+    var lines = String(text).split("\n"), count = -1, fence = null;
+    for (var i = 0; i < lines.length; i++) {
+      var f = /^ {0,3}(`{3,}|~{3,})/.exec(lines[i].replace(/^(?:\s*>)+/, ""));
+      if (f) {
+        if (!fence) fence = f[1].charAt(0); else if (f[1].charAt(0) === fence) fence = null;
+        continue;
+      }
+      if (fence) continue;
+      var m = /^(\s*(?:>\s*)*(?:[-*+]|\d{1,9}[.)])\s+\[)([ xX])(\]\s)/.exec(lines[i]);
+      if (!m) continue;
+      count++;
+      if (count === n) {
+        lines[i] = m[1] + (m[2] === " " ? "x" : " ") + lines[i].slice(m[1].length + 1);
+        return lines.join("\n");
+      }
+    }
+    return null;
+  }
+
+  // Words and a reading time for the status line.
+  function textStats(text) {
+    var words = (String(text).replace(/```[\s\S]*?```/g, " ").match(/[A-Za-z0-9À-￿][\w'’À-￿-]*/g) || []).length;
+    return { words: words, minutes: words ? Math.max(1, Math.round(words / 220)) : 0 };
+  }
+
+  // The folders above an item, outermost first (for the breadcrumb). Loops and missing parents end it.
+  function crumbPath(tree, id) {
+    var out = [], seen = {}, cur = tree.byId[id];
+    while (cur && cur.parent && !seen[cur.parent] && out.length < 12) {
+      seen[cur.parent] = true;
+      cur = tree.byId[cur.parent];
+      if (cur) out.unshift(cur);
+    }
+    return out;
+  }
+
+  // Quick find: titles that contain every word typed, best first (starts-with, then whole-word, then newest).
+  function rankFind(items, query, limit) {
+    var words = String(query).toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return items.slice().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); }).slice(0, limit);
+    var scored = [];
+    items.forEach(function (it) {
+      var t = it.title.toLowerCase();
+      if (!words.every(function (w) { return t.indexOf(w) !== -1; })) return;
+      var score = 0;
+      if (t.indexOf(words[0]) === 0) score += 4;
+      if (words.every(function (w) { return new RegExp("(^|[^a-z0-9])" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(t); })) score += 2;
+      if (it.kind === "note") score += 1;
+      scored.push({ it: it, score: score });
+    });
+    scored.sort(function (a, b) { return b.score - a.score || (b.it.updatedAt || 0) - (a.it.updatedAt || 0); });
+    return scored.slice(0, limit).map(function (s) { return s.it; });
+  }
+
   var helpers = {
     buildTree: buildTree, subtreeIds: subtreeIds, listEnter: listEnter, wrapSelection: wrapSelection,
     prefixLines: prefixLines, slashMatches: slashMatches, triggerAt: triggerAt, fileNameFor: fileNameFor,
+    toggleTask: toggleTask, textStats: textStats, crumbPath: crumbPath, rankFind: rankFind,
   };
 
   if (typeof document === "undefined") {
@@ -219,12 +278,17 @@
     });
   }
 
+  // One row of the notes list: the item itself (a button; drag it onto a folder to move it) and a
+  // "..." button for its actions (rename, move, pin, new note inside, delete).
   function itemButton(it, depth, parent) {
     var li = el("li", "", parent);
-    var b = el("button", "nb-row" + (state.cur && state.cur.note.id === it.id ? " active" : ""), li);
+    var wrap = el("div", "nb-rowwrap", li);
+    if (it.kind === "folder") wrap.setAttribute("data-folder", it.id);
+    var b = el("button", "nb-row" + (state.cur && state.cur.note.id === it.id ? " active" : ""), wrap);
     b.type = "button";
     b.setAttribute("data-id", it.id);
     b.setAttribute("data-depth", String(Math.min(depth, 8)));
+    b.draggable = true;
     if (it.kind === "folder") {
       var open = !!state.expanded[it.id];
       b.setAttribute("aria-expanded", open ? "true" : "false");
@@ -232,6 +296,11 @@
     } else el("span", "nb-ico", b, "•");
     el("span", "nb-row-title", b, it.title);
     if (it.pii && it.pii.length) { var w = el("span", "nb-pii", b, "personal data"); w.title = "This note seems to contain: " + it.pii.join(", "); }
+    var more = el("button", "nb-more", wrap, "⋯");
+    more.type = "button";
+    more.setAttribute("data-more", it.id);
+    more.setAttribute("aria-label", "Actions for " + it.title);
+    more.setAttribute("aria-haspopup", "menu");
     return li;
   }
 
@@ -250,15 +319,27 @@
     clear(nav);
     if (state.query) return;
     var pinned = state.items.filter(function (i) { return i.pinned && i.kind === "note"; });
+    // With a big notebook the notes you were just in are worth a shortcut of their own.
+    var recent = state.items.length >= 12
+      ? state.items.filter(function (i) { return i.kind === "note" && !i.pinned && i.updatedAt && Date.now() - i.updatedAt < 14 * 86400000; })
+        .sort(function (a, b) { return b.updatedAt - a.updatedAt; }).slice(0, 5)
+      : [];
     if (pinned.length) {
       el("h2", "nb-h", nav, "Pinned");
       var pul = el("ul", "nb-list", nav);
       pinned.forEach(function (it) { itemButton(it, 0, pul); });
-      el("h2", "nb-h", nav, "All notes");
     }
+    if (recent.length) {
+      el("h2", "nb-h", nav, "Recently edited");
+      var rul = el("ul", "nb-list", nav);
+      recent.forEach(function (it) { itemButton(it, 0, rul); });
+    }
+    if (pinned.length || recent.length) el("h2", "nb-h", nav, "All notes");
     var ul = el("ul", "nb-list", nav);
     renderBranch("", 0, ul);
-    if (!state.items.length) el("p", "nb-hint", nav, "Nothing here yet. Start with New note.");
+    if (!state.items.length) {
+      var hint = el("p", "nb-hint", nav, "Nothing here yet. Start with New note, or press Alt+N.");
+    }
   }
 
   function renderResults(results) {
@@ -306,6 +387,43 @@
     var tree = md.parse($("nb-text").value);
     host.appendChild(md.toDom(tree, document, { imageUrl: imageUrl, findNote: findNoteId }));
     buildOutline(host);
+    // To-do boxes can be ticked here (the page changes the Markdown line); code blocks get a Copy button.
+    Array.prototype.forEach.call(host.querySelectorAll("input.task-box"), function (box) { box.removeAttribute("disabled"); });
+    Array.prototype.forEach.call(host.querySelectorAll("pre"), function (pre) {
+      pre.classList.add("has-copy");
+      var c = el("button", "nb-copy", pre, "Copy");
+      c.type = "button";
+      c.setAttribute("aria-label", "Copy this code");
+    });
+    updateMeta();
+  }
+
+  function updateMeta() {
+    var s = textStats($("nb-text").value);
+    $("nb-meta").textContent = s.words ? s.words.toLocaleString() + " words · " + s.minutes + " min read" : "";
+  }
+
+  function copyText(text, done) {
+    function fallback() {
+      var t = document.createElement("textarea");
+      t.value = text; t.setAttribute("readonly", ""); t.className = "sr-only";
+      document.body.appendChild(t); t.select();
+      var ok = false; try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      t.remove(); done(ok);
+    }
+    if (root.navigator && root.navigator.clipboard && root.navigator.clipboard.writeText) root.navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+    else fallback();
+  }
+
+  function lightbox(src, alt) {
+    var dlg = $("nb-dialog");
+    openDialog(alt || "Image", function (body) {
+      var img = el("img", "nb-lightbox", body);
+      img.crossOrigin = "use-credentials";
+      img.alt = alt || "";
+      img.src = src;
+    });
+    dlg.classList.add("wide");
   }
 
   function buildOutline(host) {
@@ -370,6 +488,27 @@
     }
     setStatus(n.deletedAt ? "In the trash" : "Saved " + new Date(n.updatedAt).toLocaleString(), "");
     renderTree();
+    renderCrumbs();
+    store("nb.last", n.id);
+  }
+
+  // Where the open item sits: Notebook > folder > folder > this. Each folder opens when clicked.
+  function renderCrumbs() {
+    var nav = $("nb-crumbs");
+    clear(nav);
+    nav.hidden = !state.cur;
+    if (!state.cur) return;
+    var home = el("button", "nb-crumb", nav, "Notebook");
+    home.type = "button";
+    home.addEventListener("click", function () { flush().then(function () { state.cur = null; show("empty"); renderTree(); renderCrumbs(); try { history.replaceState(null, "", location.pathname); } catch (e) { /* ignore */ } }); });
+    crumbPath(state.tree, state.cur.note.id).forEach(function (f) {
+      el("span", "nb-crumb-sep", nav, "›");
+      var b = el("button", "nb-crumb", nav, f.title);
+      b.type = "button";
+      b.addEventListener("click", function () { state.expanded[f.id] = true; openItem(f.id); });
+    });
+    el("span", "nb-crumb-sep", nav, "›");
+    el("span", "nb-crumb-here", nav, state.cur.note.title);
   }
 
   function renderFolderList(id) {
@@ -450,7 +589,7 @@
           if (state.dirty) schedule();
           setStatus(state.dirty ? "Unsaved changes" : "Saved " + new Date(r.json.note.updatedAt).toLocaleTimeString(), state.dirty ? "warn" : "ok");
           var idx = state.items.filter(function (i) { return i.id === n.id; })[0];
-          if (idx) { var m = r.json.note; idx.title = m.title; idx.pinned = m.pinned; idx.parent = m.parent; idx.tags = m.tags; idx.pii = m.pii; idx.rev = m.rev; rebuildIndex(); renderTree(); }
+          if (idx) { var m = r.json.note; idx.title = m.title; idx.pinned = m.pinned; idx.parent = m.parent; idx.tags = m.tags; idx.pii = m.pii; idx.rev = m.rev; idx.updatedAt = m.updatedAt; rebuildIndex(); renderTree(); renderCrumbs(); }
           if (n.kind === "note") { $("nb-pin").setAttribute("aria-pressed", r.json.note.pinned ? "true" : "false"); $("nb-pin").textContent = r.json.note.pinned ? "Unpin" : "Pin"; }
           return true;
         }
@@ -518,7 +657,7 @@
       return call("POST", "/note", fields).then(function (r) {
         if (r.status !== 201) { setStatus(explain(r), "bad"); return null; }
         var n = r.json.note;
-        state.items.push({ id: n.id, parent: n.parent, kind: n.kind, title: n.title, tags: n.tags, pinned: n.pinned, rev: n.rev, pii: n.pii });
+        state.items.push({ id: n.id, parent: n.parent, kind: n.kind, title: n.title, tags: n.tags, pinned: n.pinned, rev: n.rev, pii: n.pii, updatedAt: n.updatedAt });
         if (n.parent) state.expanded[n.parent] = true;
         rebuildIndex();
         applyNote(r.json);
@@ -546,6 +685,7 @@
 
   function openDialog(title, build) {
     var dlg = $("nb-dialog");
+    dlg.classList.remove("wide");
     $("nb-dialog-title").textContent = title;
     var body = $("nb-dialog-body");
     clear(body);
@@ -553,9 +693,104 @@
     if (!dlg.open) dlg.showModal();
   }
 
-  function moveDialog() {
-    if (!state.cur) return;
-    var n = state.cur.note;
+  // ---- changing an item that is not the open one (the row menu, drag and drop)
+
+  // Apply `fields` to any item. The open item goes through the normal save (so unsaved text is not
+  // lost); another one is changed against the revision the notes list holds, and a clash (409) just
+  // refreshes the list and says so.
+  function patchItem(id, fields) {
+    if (state.cur && state.cur.note.id === id) return save(fields).then(function (ok) { return ok !== false; });
+    var it = state.tree && state.tree.byId[id];
+    if (!it) return Promise.resolve(false);
+    var body = { baseRev: it.rev };
+    for (var k in fields) body[k] = fields[k];
+    return enqueue(function () {
+      return call("PATCH", "/note?id=" + id, body).then(function (r) {
+        if (r.status === 200) {
+          var m = r.json.note;
+          it.title = m.title; it.pinned = m.pinned; it.parent = m.parent; it.tags = m.tags; it.pii = m.pii; it.rev = m.rev; it.updatedAt = m.updatedAt;
+          rebuildIndex(); renderTree(); renderCrumbs();
+          if (state.cur && state.cur.note.kind === "folder") renderFolderList(state.cur.note.id);
+          return true;
+        }
+        if (r.status === 409) { setStatus("That item changed somewhere else; the list has been refreshed. Try again.", "warn"); refreshTree(); return false; }
+        setStatus("Could not change it: " + explain(r), "bad");
+        return false;
+      });
+    });
+  }
+
+  function moveItem(id, targetFolderId) {
+    var it = state.tree.byId[id];
+    if (!it || (it.parent || null) === (targetFolderId || null)) return Promise.resolve(false);
+    if (targetFolderId && subtreeIds(state.tree, id).indexOf(targetFolderId) !== -1) { setStatus("A folder cannot go inside itself.", "warn"); return Promise.resolve(false); }
+    return patchItem(id, { parent: targetFolderId || null }).then(function (ok) {
+      if (ok && targetFolderId) { state.expanded[targetFolderId] = true; store("nb.open", JSON.stringify(state.expanded)); renderTree(); }
+      if (ok) setStatus("Moved “" + it.title + "”.", "ok");
+      return ok;
+    });
+  }
+
+  function renameInline(id) {
+    var row = document.querySelector('#nb-tree button.nb-row[data-id="' + id + '"], #nb-folder-list button.nb-row[data-id="' + id + '"]');
+    var it = state.tree.byId[id];
+    if (!row || !it) return;
+    var span = row.querySelector(".nb-row-title");
+    var inp = document.createElement("input");
+    inp.type = "text"; inp.value = it.title; inp.maxLength = 200; inp.className = "nb-rename"; inp.setAttribute("aria-label", "New name");
+    row.draggable = false;
+    span.replaceWith(inp);
+    inp.focus(); inp.select();
+    var done = false;
+    function finish(commit) {
+      if (done) return; done = true;
+      var v = inp.value.trim();
+      if (commit && v && v !== it.title) patchItem(id, { title: v }); else renderTree();
+    }
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); finish(true); } else if (e.key === "Escape") { e.preventDefault(); finish(false); } e.stopPropagation(); });
+    inp.addEventListener("click", function (e) { e.stopPropagation(); });
+    inp.addEventListener("blur", function () { finish(true); });
+  }
+
+  var menuEl = null;
+  function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+  function rowMenu(id, anchor) {
+    closeMenu();
+    var it = state.tree.byId[id];
+    if (!it) return;
+    var m = el("div", "nb-menu", document.body);
+    m.setAttribute("role", "menu");
+    menuEl = m;
+    function item(label, fn, cls) {
+      var b = el("button", "nb-menu-item" + (cls ? " " + cls : ""), m, label);
+      b.type = "button"; b.setAttribute("role", "menuitem");
+      b.addEventListener("click", function () { closeMenu(); fn(); });
+    }
+    item("Rename", function () { renameInline(id); });
+    item("Move to…", function () { moveDialog(id); });
+    if (it.kind === "note") item(it.pinned ? "Unpin" : "Pin to the top", function () { patchItem(id, { pinned: !it.pinned }); });
+    if (it.kind === "folder") {
+      item("New note inside", function () { state.expanded[id] = true; newNote(id); });
+      item("New folder inside", function () { state.expanded[id] = true; newFolder(id); });
+    }
+    item("Move to trash…", function () { confirmDelete(id); }, "nb-danger");
+    var r = anchor.getBoundingClientRect();
+    m.style.top = Math.min(r.bottom + 4, root.innerHeight - m.offsetHeight - 8) + "px";
+    m.style.left = Math.max(8, Math.min(r.left, root.innerWidth - m.offsetWidth - 8)) + "px";
+    var first = m.querySelector("button"); if (first) first.focus();
+    m.addEventListener("keydown", function (e) {
+      var bs = [].slice.call(m.querySelectorAll("button")), i = bs.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); bs[(i + bs.length - 1) % bs.length].focus(); }
+      else if (e.key === "Escape") { e.preventDefault(); closeMenu(); anchor.focus(); }
+      else if (e.key === "Tab") closeMenu();
+    });
+  }
+
+  function moveDialog(id) {
+    var cur = id && state.tree.byId[id] ? state.tree.byId[id] : (state.cur && state.cur.note);
+    if (!cur) return;
+    var n = { id: cur.id, kind: cur.kind, title: cur.title, parent: cur.parent || null };
     var bad = n.kind === "folder" ? subtreeIds(state.tree, n.id) : [];
     openDialog("Move “" + n.title + "”", function (body, close) {
       var sel = el("select", "nb-select", body);
@@ -574,17 +809,15 @@
       go.type = "button";
       go.addEventListener("click", function () {
         var target = sel.value || null;
-        save({ parent: target }).then(function (ok) {
-          if (ok !== false) { if (target) state.expanded[target] = true; renderTree(); close(); }
-          else setStatus("Could not move it.", "bad");
-        });
+        moveItem(n.id, target).then(function () { close(); });
       });
     });
   }
 
-  function confirmDelete() {
-    if (!state.cur) return;
-    var n = state.cur.note;
+  function confirmDelete(id) {
+    var cur = id && state.tree.byId[id] ? state.tree.byId[id] : (state.cur && state.cur.note);
+    if (!cur) return;
+    var n = { id: cur.id, kind: cur.kind, title: cur.title };
     var what = n.kind === "folder" ? "folder “" + n.title + "” and everything in it" : "“" + n.title + "”";
     openDialog("Move to the trash?", function (body, close) {
       el("p", "", body, "The " + what + " goes to the trash. You can restore it from there.");
@@ -594,11 +827,16 @@
         flush().then(function () {
           return call("DELETE", "/note?id=" + n.id).then(function (r) {
             if (r.status !== 200) { setStatus(explain(r), "bad"); return; }
-            state.cur = null; state.dirty = false;
             close();
-            show("empty");
-            try { history.replaceState(null, "", location.pathname); } catch (e) { /* ignore */ }
-            refreshTree();
+            // Trashing the open item (or a folder it sits in) closes it; anything else leaves the editor alone.
+            var openId = state.cur && state.cur.note.id;
+            if (openId && (openId === n.id || subtreeIds(state.tree, n.id).indexOf(openId) !== -1)) {
+              state.cur = null; state.dirty = false;
+              show("empty");
+              try { history.replaceState(null, "", location.pathname); } catch (e) { /* ignore */ }
+            }
+            refreshTree().then(renderCrumbs);
+            setStatus("Moved “" + n.title + "” to the trash.", "ok");
           });
         });
       });
@@ -889,6 +1127,70 @@
     }
   }
 
+  // ---- quick find and shortcuts
+
+  // Alt+K (or Ctrl+K outside the editor): type a few letters of a title, Enter opens it. With nothing
+  // typed it lists the notes you touched most recently. The last choice searches inside every note.
+  function quickFind() {
+    if (!state.tree) return;
+    openDialog("Find a note", function (body, close) {
+      var inp = el("input", "nb-confirm", body);
+      inp.type = "search"; inp.placeholder = "Start typing a title…"; inp.autocomplete = "off"; inp.setAttribute("aria-label", "Find a note by title");
+      var ul = el("ul", "nb-find", body);
+      var picks = [], idx = 0;
+      function draw() {
+        clear(ul);
+        var q = inp.value.trim();
+        picks = rankFind(state.items, q, 10).map(function (it) { return { it: it }; });
+        if (q.length >= 2) picks.push({ search: q });
+        if (q) picks.push({ create: q });
+        if (idx >= picks.length) idx = Math.max(0, picks.length - 1);
+        picks.forEach(function (p, i) {
+          var li = el("li", "", ul);
+          var b = el("button", "nb-find-item" + (i === idx ? " on" : ""), li);
+          b.type = "button";
+          if (p.it) {
+            var where = crumbPath(state.tree, p.it.id).map(function (f) { return f.title; }).join(" › ");
+            el("span", "nb-find-title", b, (p.it.kind === "folder" ? "📁 " : "") + p.it.title);
+            if (where) el("span", "nb-find-where", b, where);
+          } else if (p.search) el("span", "nb-find-title", b, "Search inside every note for “" + p.search + "”");
+          else el("span", "nb-find-title", b, "Create a note called “" + p.create + "”");
+          b.addEventListener("mousedown", function (e) { e.preventDefault(); idx = i; choose(); });
+        });
+      }
+      function choose() {
+        var p = picks[idx];
+        if (!p) return;
+        close();
+        if (p.it) { if (p.it.kind === "folder") state.expanded[p.it.id] = true; openItem(p.it.id); }
+        else if (p.search) { var s = $("nb-search"); s.value = p.search; s.dispatchEvent(new Event("input")); collapseSide(false); }
+        else create({ title: p.create.slice(0, 200), body: "", kind: "note", parent: null }).then(function (n) { if (n) textarea().focus(); });
+      }
+      inp.addEventListener("input", function () { idx = 0; draw(); });
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowDown") { e.preventDefault(); idx = Math.min(idx + 1, picks.length - 1); draw(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); idx = Math.max(idx - 1, 0); draw(); }
+        else if (e.key === "Enter") { e.preventDefault(); choose(); }
+      });
+      draw();
+      setTimeout(function () { inp.focus(); }, 30);
+    });
+  }
+
+  function shortcutsDialog() {
+    openDialog("Keyboard shortcuts", function (body) {
+      var rows = [
+        ["Alt+K", "Find a note by title"], ["Alt+N", "New note (inside the open folder)"], ["/", "Search inside all notes"],
+        ["Ctrl+S", "Save now (it also saves as you type)"], ["Ctrl+B / Ctrl+I", "Bold / italic"], ["Ctrl+K", "Insert a link (in the editor)"],
+        ["/ at the start of a line", "Pick a heading, list, table, callout…"], ["[[", "Link to another note"],
+        ["Tab", "Indent a list item"], ["Enter on an empty bullet", "Leave the list"], ["?", "Show this list"],
+      ];
+      var t = el("table", "nb-keys", body);
+      rows.forEach(function (r) { var tr = el("tr", "", t); el("th", "", tr, r[0]); el("td", "", tr, r[1]); });
+      el("p", "nb-hint", body, "Drag a note onto a folder to move it. The ⋯ button on a row (or right-click) has rename, move, pin and trash. Click a to-do box in the preview to tick it. Click an image to enlarge it.");
+    });
+  }
+
   // ---- wiring
 
   function route() {
@@ -927,6 +1229,86 @@
       var b = e.target.closest ? e.target.closest("button[data-id]") : null;
       if (b) openItem(b.getAttribute("data-id"));
     });
+    // The "..." button on a row opens its menu (rename, move, pin, new inside, trash).
+    [$("nb-tree"), $("nb-folder-list")].forEach(function (host) {
+      host.addEventListener("click", function (e) {
+        var m = e.target.closest ? e.target.closest("button[data-more]") : null;
+        if (!m) return;
+        e.stopPropagation();
+        rowMenu(m.getAttribute("data-more"), m);
+      });
+      host.addEventListener("contextmenu", function (e) {
+        var row = e.target.closest ? e.target.closest("button.nb-row[data-id]") : null;
+        if (!row) return;
+        e.preventDefault();
+        rowMenu(row.getAttribute("data-id"), row);
+      });
+    });
+    document.addEventListener("click", function (e) { if (menuEl && !(e.target.closest && e.target.closest(".nb-menu, .nb-more"))) closeMenu(); });
+
+    // Drag a note or folder onto a folder to move it; drop on the empty space (or "All notes") for the top level.
+    var dragId = null;
+    function dropTarget(e) {
+      var w = e.target.closest ? e.target.closest(".nb-rowwrap") : null;
+      if (w) return w.hasAttribute("data-folder") ? w : null;   // a folder takes it; a note row does not
+      return $("nb-tree").contains(e.target) ? $("nb-tree") : null;
+    }
+    function clearDrop() { Array.prototype.forEach.call(document.querySelectorAll(".drop-on"), function (n) { n.classList.remove("drop-on"); }); }
+    $("nb-tree").addEventListener("dragstart", function (e) {
+      var row = e.target.closest ? e.target.closest("button.nb-row[data-id]") : null;
+      if (!row) return;
+      dragId = row.getAttribute("data-id");
+      try { e.dataTransfer.setData("text/plain", dragId); e.dataTransfer.effectAllowed = "move"; } catch (x) { /* ignore */ }
+      row.classList.add("dragging");
+    });
+    $("nb-tree").addEventListener("dragend", function () { dragId = null; clearDrop(); Array.prototype.forEach.call(document.querySelectorAll(".dragging"), function (n) { n.classList.remove("dragging"); }); });
+    $("nb-tree").addEventListener("dragover", function (e) {
+      if (!dragId) return;
+      var t = dropTarget(e);
+      if (!t) return;
+      var folderId = t.getAttribute("data-folder");
+      if (folderId && subtreeIds(state.tree, dragId).indexOf(folderId) !== -1) return;
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = "move"; } catch (x) { /* ignore */ }
+      clearDrop(); t.classList.add("drop-on");
+    });
+    $("nb-tree").addEventListener("drop", function (e) {
+      if (!dragId) return;
+      e.preventDefault();
+      var t = dropTarget(e), id = dragId;
+      dragId = null; clearDrop();
+      if (t) moveItem(id, t.getAttribute("data-folder") || null);
+    });
+
+    // Sidebar helpers.
+    $("nb-expand-all").addEventListener("click", function () {
+      state.items.forEach(function (i) { if (i.kind === "folder") state.expanded[i.id] = true; });
+      store("nb.open", JSON.stringify(state.expanded)); renderTree();
+    });
+    $("nb-collapse-all").addEventListener("click", function () { state.expanded = {}; store("nb.open", "{}"); renderTree(); });
+    // A closed dialog must not keep focus (it would make the page think you are still typing in a box).
+    $("nb-dialog").addEventListener("close", function () {
+      var a = document.activeElement;
+      if (a && $("nb-dialog").contains(a) && a.blur) a.blur();
+    });
+    $("nb-quick").addEventListener("click", quickFind);
+    $("nb-shortcuts").addEventListener("click", shortcutsDialog);
+    $("nb-empty-note").addEventListener("click", function () { newNote(null); });
+    $("nb-empty-folder").addEventListener("click", function () { newFolder(null); });
+    $("nb-empty-find").addEventListener("click", quickFind);
+
+    // Anywhere on the page: Alt+K quick find, Alt+N new note, "/" to search; Ctrl+K quick find outside the editor.
+    document.addEventListener("keydown", function (e) {
+      if ($("nb").hidden || document.querySelector("dialog[open]")) return;
+      var tag = (document.activeElement && document.activeElement.tagName) || "";
+      var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (document.activeElement && document.activeElement.isContentEditable);
+      var k = e.key.toLowerCase();
+      if (e.altKey && !e.ctrlKey && !e.metaKey && k === "k") { e.preventDefault(); quickFind(); }
+      else if (e.altKey && !e.ctrlKey && !e.metaKey && k === "n") { e.preventDefault(); newNote(); }
+      else if ((e.ctrlKey || e.metaKey) && !e.altKey && k === "k" && !typing) { e.preventDefault(); quickFind(); }
+      else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); $("nb-search").focus(); }
+      else if (e.key === "?" && !typing) { e.preventDefault(); shortcutsDialog(); }
+    });
 
     $("nb-search").addEventListener("input", function (e) {
       var q = e.target.value.trim();
@@ -961,11 +1343,11 @@
       b.addEventListener("click", function () { setMode(b.getAttribute("data-mode")); });
     });
     $("nb-pin").addEventListener("click", function () { save({ pinned: !state.cur.note.pinned }); });
-    $("nb-move").addEventListener("click", moveDialog);
-    $("nb-folder-move").addEventListener("click", moveDialog);
+    $("nb-move").addEventListener("click", function () { moveDialog(); });
+    $("nb-folder-move").addEventListener("click", function () { moveDialog(); });
     $("nb-history").addEventListener("click", historyDialog);
-    $("nb-delete").addEventListener("click", confirmDelete);
-    $("nb-folder-delete").addEventListener("click", confirmDelete);
+    $("nb-delete").addEventListener("click", function () { confirmDelete(); });
+    $("nb-folder-delete").addEventListener("click", function () { confirmDelete(); });
     $("nb-folder-note").addEventListener("click", function () { newNote(state.cur.note.id); });
     $("nb-folder-sub").addEventListener("click", function () { newFolder(state.cur.note.id); });
     $("nb-download").addEventListener("click", function () {
@@ -978,7 +1360,27 @@
       var a = e.target.closest ? e.target.closest("a.wiki[data-note]") : null;
       if (a) { e.preventDefault(); openItem(a.getAttribute("data-note")); return; }
       var m = e.target.closest ? e.target.closest("span.wiki.missing[data-wiki]") : null;
-      if (m) { create2(m.getAttribute("data-wiki")); }
+      if (m) { create2(m.getAttribute("data-wiki")); return; }
+      var cp = e.target.closest ? e.target.closest("button.nb-copy") : null;
+      if (cp) {
+        var code = cp.parentNode.querySelector("code");
+        copyText(code ? code.textContent : "", function (ok) { cp.textContent = ok ? "Copied" : "Press Ctrl+C"; setTimeout(function () { cp.textContent = "Copy"; }, 1600); });
+        return;
+      }
+      var im = e.target.closest ? e.target.closest("img.nb-img") : null;
+      if (im) lightbox(im.src, im.alt);
+    });
+    // Ticking a to-do box in the preview ticks the matching "- [ ]" line in the text.
+    $("nb-preview").addEventListener("change", function (e) {
+      var box = e.target;
+      if (!box.classList || !box.classList.contains("task-box")) return;
+      var boxes = [].slice.call($("nb-preview").querySelectorAll("input.task-box"));
+      var next = toggleTask(textarea().value, boxes.indexOf(box));
+      if (next === null) { box.checked = !box.checked; return; }
+      var wrap = $("nb-preview").parentNode, y = wrap.scrollTop;
+      textarea().value = next;
+      onEdit();
+      setTimeout(function () { wrap.scrollTop = y; }, PREVIEW_MS + 60);
     });
     $("nb-backlinks-list").addEventListener("click", function (e) {
       var a = e.target.closest ? e.target.closest("a[data-note]") : null;
@@ -1002,7 +1404,11 @@
       $("nb-gate").hidden = true;
       $("nb").hidden = false;
       show("empty");
+      renderCrumbs();
       route();
+      // Pick up where you left off.
+      var last = store("nb.last");
+      if (!(location.hash || "").slice(1) && last && state.tree.byId[last]) openItem(last, true);
     });
   }
 

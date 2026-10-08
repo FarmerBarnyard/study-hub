@@ -38,10 +38,17 @@
           <button type="button" class="btn" id="nb-new-note">New note</button>
           <button type="button" class="btn" id="nb-new-folder">New folder</button>
         </div>
+        <div class="nb-side-tools">
+          <button type="button" class="nb-link" id="nb-quick" title="Find a note by title (Alt+K)">Find a note</button>
+          <span class="nb-spacer"></span>
+          <button type="button" class="nb-link" id="nb-expand-all" title="Open every folder">Expand all</button>
+          <button type="button" class="nb-link" id="nb-collapse-all" title="Close every folder">Collapse all</button>
+        </div>
       </div>
       <nav id="nb-tree" class="nb-tree" aria-label="Notes"></nav>
       <div class="nb-side-foot">
         <button type="button" class="nb-link" id="nb-open-trash">Trash</button>
+        <button type="button" class="nb-link" id="nb-shortcuts" title="Keyboard shortcuts (?)">Shortcuts</button>
         <button type="button" class="nb-link" id="nb-open-notebook">Notebook</button>
       </div>
     </aside>
@@ -49,9 +56,22 @@
     <section class="nb-main" aria-label="Editor">
       <button type="button" class="btn nb-side-toggle" id="nb-side-toggle" aria-expanded="true" aria-controls="nb-side">Notes list</button>
 
+      <nav id="nb-crumbs" class="nb-crumbs" aria-label="Where this note is" hidden></nav>
+
       <div id="nb-empty" class="nb-empty">
         <h2>Pick a note, or start a new one</h2>
-        <p>Use <kbd>/</kbd> at the start of a line for headings, lists, tables and callouts, and <kbd>[[</kbd> to link to another note. Paste or drop a screenshot to add an image. A web address on its own line becomes a link card.</p>
+        <div class="nb-empty-actions">
+          <button type="button" class="btn" id="nb-empty-note">New note</button>
+          <button type="button" class="btn" id="nb-empty-folder">New folder</button>
+          <button type="button" class="btn" id="nb-empty-find">Find a note <kbd>Alt+K</kbd></button>
+        </div>
+        <ul class="nb-tips">
+          <li>Type <kbd>/</kbd> at the start of a line for headings, lists, tables and callouts.</li>
+          <li>Type <kbd>[[</kbd> to link to another note.</li>
+          <li>Paste or drop a screenshot to add an image; click an image to enlarge it.</li>
+          <li>A web address on its own line becomes a link card.</li>
+          <li>Drag a note onto a folder to move it. Press <kbd>?</kbd> for every shortcut.</li>
+        </ul>
       </div>
 
       <div id="nb-editor" class="nb-editor" hidden>
@@ -61,6 +81,7 @@
           <span id="nb-status" class="nb-status" role="status" aria-live="polite"></span>
         </div>
         <div class="nb-bar nb-bar-sub">
+          <span id="nb-meta" class="nb-meta"></span>
           <label class="nb-tags-label" for="nb-tags">Tags</label>
           <input id="nb-tags" class="nb-tags" type="text" maxlength="400" autocomplete="off" placeholder="azure, identity">
           <span class="nb-spacer"></span>
