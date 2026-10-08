@@ -85,6 +85,17 @@ A Notion-free place to take notes, written in Markdown with a live preview. Note
 - The page CSP is `img-src 'self' https://api.barnyard.site` (images come from the Worker) and `connect-src 'self' https://api.barnyard.site`.
 - A password or key in a note is refused by the Worker (`secret_detected`) and the page says so; personal details are flagged on the note rather than refused.
 
+## Knowledgebase: shared articles built from notes (`knowledgebase.html`, 2026-10-08)
+
+The shared side of the notebook. An article is a COPY of one or more notes that a signed-in person chose to publish; everyone who can sign in to the study site (group `study-hub-sso`) can read it. Stored by the Worker (`api.barnyard.site/kb/*`, one shared Durable Object; see `ClaudeRepo/cloudflare-worker/README.md` "Knowledgebase"). Nothing is stored in this repo. There is a "Knowledgebase" item in the shared menu on all four sites.
+
+- `kb.js` is the page. Views by address hash: `#/` library (search that also reads article text, tag chips, sort, "my articles"), `#/a/<id>` an article, `#/new[?note=<id>]` generate and publish, `#/edit/<id>` edit your own. An article is shown with a colour treatment (eight, chosen from the title unless the author picks one), a banner, contents list with the current section highlighted, reading progress, copy buttons on code, enlargeable images, related articles and "linked from". Authors can edit, hide/show or delete their own; the owner can hide or delete any. Pure helpers are tested in `test/kb.test.js`.
+- **Generate from notes** (`kb-format.js`, tested in `test/kb-format.test.js`) needs no AI: it tidies the Markdown, drops a first heading that repeats the title, starts sections at `##` (each note becomes a section when several are chosen), turns `[[links]]` to your own notes into plain text (other people cannot open them) unless they name an article already in the library, takes the first real paragraph as the summary and gathers the tags. It shows what is in the draft before anything is shared.
+- **Optional AI summary and key points** (button in the editor): the article text goes to the site's own Ollama model through the Worker (never an outside service), is capped, limited to 10 a day per person, and the answer goes into the summary box and a "Key points" callout for the author to edit. It is slow (a minute or two) and only works while the model's machine and tunnel are up; otherwise the button says so.
+- Publishing needs a recent sign-in (like export). A password or key in the text is refused; personal details (email, phone, card numbers...) need the author to confirm "Publish anyway". Images are copied from the author's notebook into the article's own storage when it is saved, so only images the author put in the article become readable by others.
+- `markdown.js` links `[[Title]]` to articles through the page-supplied `hrefFor`/`findNote`/`missingTitle` options.
+- Notes page: a "Publish…" button on a note opens the generator with that note selected.
+
 ## Deploy
 
 GitHub Pages, custom domain `study.barnyard.site` (see `CNAME`), DNS + TLS via Cloudflare (proxied CNAME on the `barnyard.site` zone, matching `dashboard`/`stocks`/`api`'s existing setup).
