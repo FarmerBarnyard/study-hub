@@ -9,11 +9,11 @@ var passed = 0;
 function test(name, fn) { fn(); passed++; console.log("ok - " + name); }
 
 test("a single note keeps its words, drops a heading that repeats the title, and starts sections at ##", function () {
-  var d = f.draftFromNotes([{ title: "SC-300", body: "# SC-300\n\nIntro text here.\n\n# Part one\n\nText.\n\n## Detail\n\nMore.", tags: ["Azure"] }]);
+  var d = f.draftFromNotes([{ title: "SC-300", body: "# SC-300\n\nIntro text here that is long enough to be a summary.\n\n# Part one\n\nText.\n\n## Detail\n\nMore.", tags: ["Azure"] }]);
   assert.strictEqual(d.title, "SC-300");
-  assert.strictEqual(d.body, "Intro text here.\n\n## Part one\n\nText.\n\n### Detail\n\nMore.\n");
+  assert.strictEqual(d.body, "Intro text here that is long enough to be a summary.\n\n## Part one\n\nText.\n\n### Detail\n\nMore.\n");
   assert.deepStrictEqual(d.tags, ["azure"]);
-  assert.strictEqual(d.summary, "Intro text here.");
+  assert.strictEqual(d.summary, "Intro text here that is long enough to be a summary.");
 });
 
 test("several notes become sections in the order given, each under its own ## heading", function () {
@@ -95,6 +95,25 @@ test("what a draft produces renders as a callout with the points inside it", fun
   var tree = md.parse(body);
   assert.strictEqual(tree[0].t, "quote");
   assert.strictEqual(tree[0].callout, "TIP");
+});
+
+test("the summary prefers a real paragraph, skips picture captions and short stubs", function () {
+  var long = "This paragraph is long enough to say something useful about the topic.";
+  assert.strictEqual(f.summaryOf("Image 1: The Shared Responsibility Model\n\nShort.\n\n" + long), long);
+  assert.strictEqual(f.summaryOf("Intro paragraph with a list straight after it that runs long enough\n- one two three four five six seven\n"), "Intro paragraph with a list straight after it that runs long enough");
+});
+
+test("with no paragraph it uses a list item, then says what the article covers, then whatever is there", function () {
+  assert.strictEqual(f.summaryOf("## A\n\n- Always keep three copies of important data offsite\n- b\n"), "Always keep three copies of important data offsite");
+  assert.strictEqual(f.summaryOf("## Users\n\n- a\n\n## Groups\n\n- b\n\n## Roles\n\n- c\n\n## Licences\n\n- d"), "Covers Users, Groups and Roles and more.");
+  assert.strictEqual(f.summaryOf("## Users\n\n- a\n\n## Groups\n\n- b"), "Covers Users and Groups.");
+  assert.strictEqual(f.summaryOf("Short line.\n"), "Short line.");
+  assert.strictEqual(f.summaryOf("# Only a heading"), "");
+  assert.strictEqual(f.summaryOf(""), "");
+});
+
+test("a to-do list is not mistaken for prose and its boxes are dropped from the text", function () {
+  assert.strictEqual(f.summaryOf("- [ ] Revise the identity governance chapter before the exam\n- [x] done"), "Revise the identity governance chapter before the exam");
 });
 
 console.log("\n" + passed + " passed");

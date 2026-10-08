@@ -126,24 +126,60 @@
 
   // The first paragraph of ordinary prose (not a heading, list, quote, table, code, image or link card).
   function firstParagraph(text, max) {
-    var limit = max || MAX_SUMMARY;
-    var para = [], found = "";
-    eachLine(text, function (line, inCode) {
-      if (found) return;
-      var t = line.trim();
-      if (inCode) { para = []; return; }
-      if (!t) { if (para.length) found = plain(para.join(" ")); para = []; return; }
-      var prose = !/^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\||!\[|\||={3,}|-{3,}$)/.test(t) && !/^(\[[^\]]+\]\()?https?:\/\/\S+\)?$/.test(t);
-      if (!prose) { para = []; return; }
-      para.push(t);
-    });
-    if (!found && para.length) found = plain(para.join(" "));
+    return clip(proseOf(text).paras[0] || "", max || MAX_SUMMARY);
+  }
+
+  // Cut to `limit` characters at the end of a sentence if there is one past the middle, else at a word.
+  function clip(found, limit) {
     if (found.length <= limit) return found;
     var cut = found.slice(0, limit);
     var stop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
     if (stop > limit * 0.5) return cut.slice(0, stop + 1);
     var sp = cut.lastIndexOf(" ");
     return (sp > limit * 0.5 ? cut.slice(0, sp) : cut).replace(/[,;:\s]+$/, "") + "…";
+  }
+
+  var CAPTION = /^(image|figure|fig\.?|table|source)\s*\d*\s*[:.\-–]/i;
+  function words(s) { return (String(s).match(/[\p{L}\p{N}']+/gu) || []).length; }
+
+  // Ordinary prose paragraphs and list items, in order, as plain text: not headings, quotes, tables,
+  // code, images, link cards or picture captions ("Image 1: ...").
+  function proseOf(text) {
+    var paras = [], items = [], para = [];
+    function flush() {
+      if (para.length) { var p = plain(para.join(" ")); if (p && !CAPTION.test(p)) paras.push(p); }
+      para = [];
+    }
+    eachLine(text, function (line, inCode) {
+      var t = line.trim();
+      if (inCode) { flush(); return; }
+      if (!t) { flush(); return; }
+      var item = /^(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?(.+)$/.exec(t);
+      if (item) { flush(); var it = plain(item[1]); if (it && !CAPTION.test(it)) items.push(it); return; }
+      var prose = !/^(#{1,6}\s|>|\||!\[|={3,}|-{3,}$)/.test(t) && !/^(\[[^\]]+\]\()?https?:\/\/\S+\)?$/.test(t);
+      if (!prose) { flush(); return; }
+      para.push(t);
+    });
+    flush();
+    return { paras: paras, items: items };
+  }
+
+  // A line for the top of an article, from the text alone: the first real paragraph (long enough to say
+  // something), else the first sentence-like list item, else what the article covers (its section
+  // headings), else whatever short paragraph there is.
+  function summaryOf(text, max) {
+    var limit = max || MAX_SUMMARY, p = proseOf(text);
+    var para = p.paras.filter(function (s) { return words(s) >= 8; })[0];
+    if (para) return clip(para, limit);
+    var item = p.items.filter(function (s) { return words(s) >= 6; })[0];
+    if (item) return clip(item, limit);
+    var heads = headingsOf(text).filter(function (h) { return h.level >= 2 && h.level <= 3 && h.text; }).map(function (h) { return h.text; });
+    if (heads.length >= 2) {
+      var shown = heads.slice(0, 3);
+      var list = shown.length === 2 ? shown.join(" and ") : shown.slice(0, -1).join(", ") + " and " + shown[shown.length - 1];
+      return clip("Covers " + list + (heads.length > 3 ? " and more" : "") + ".", limit);
+    }
+    return clip(p.paras[0] || p.items[0] || "", limit);
   }
 
   function headingsOf(text) {
@@ -199,7 +235,7 @@
     var counts = countOf(body);
     return {
       title: title,
-      summary: firstParagraph(body, MAX_SUMMARY),
+      summary: summaryOf(body, MAX_SUMMARY),
       tags: mergeTags(list),
       body: body,
       report: { words: counts.words, images: counts.images, codeBlocks: counts.codeBlocks, linkCards: counts.linkCards, sections: headingsOf(body).filter(function (h) { return h.level === 2; }).length, flattenedLinks: removed },
@@ -225,7 +261,7 @@
 
   var api = {
     draftFromNotes: draftFromNotes, cleanBody: cleanBody, stripLeadingTitle: stripLeadingTitle, shiftHeadings: shiftHeadings,
-    flattenLinks: flattenLinks, firstParagraph: firstParagraph, headingsOf: headingsOf, headingId: headingId,
+    flattenLinks: flattenLinks, firstParagraph: firstParagraph, summaryOf: summaryOf, headingsOf: headingsOf, headingId: headingId,
     withKeyPoints: withKeyPoints, countOf: countOf, plain: plain,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
