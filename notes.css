@@ -215,3 +215,8 @@ kbd { font: 12px var(--font-mono); padding: 1px 6px; border: 1px solid var(--lin
 @media (hover: none) { .nb-copy { opacity: .8; } }
 .md img.nb-img { cursor: zoom-in; }
 .md input.task-box { cursor: pointer; }
+
+.nb-modehint { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: var(--info-soft); color: var(--fg); font-size: 13.5px; }
+.nb-modehint[hidden] { display: none; }
+.nb-modehint .nb-link { color: var(--info); font-weight: 600; text-decoration: underline; padding: 0 0 0 4px; }
+.nb-panes[data-mode="preview"] .nb-prev-wrap { max-height: none; }
