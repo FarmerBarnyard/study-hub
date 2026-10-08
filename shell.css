@@ -387,3 +387,15 @@ fieldset fieldset { margin-top: 20px; }
   .live::before, .live-dot.live-ok, .spine.enter li { animation: none; }
   .settings, .toast, .tile-card, .sw-toggle i, .sw-toggle i::after { transition: none; }
 }
+
+/* ---------- very wide screens ---------- */
+/* From 1900px wide, a page that opts in with <body data-wide> may grow past the 1320px cap, so a
+   large monitor is not left a third empty. The cap stays for every other page. What a page does with
+   the room (a rail, more columns) is its own stylesheet's business; the shared part is the cap and the
+   hub's widget grid: six columns at about the width four had, so more widgets sit side by side
+   and nothing gets bigger. A full-width widget takes half the row, beside the last short row. */
+@media (min-width: 1900px) {
+  body[data-wide] .content { max-width: 2140px; }
+  body[data-wide] .widgets { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  body[data-wide] .w[data-size="4"] { grid-column: span 3; }
+}

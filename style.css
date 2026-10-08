@@ -70,3 +70,12 @@ section.cert-section { margin-bottom: 40px; }
 
 .page-head .nb-open{font-weight:600;align-self:flex-end;font-size:14px;}
 .page-head .nb-open a{color:var(--amber);}
+
+/* Very wide screens (the page opts in with data-wide; see shell.css): Ongoing on the left, the
+   quieter Completed list beside it, instead of one narrow column with the rest of the screen empty.
+   The cards keep their size. */
+@media (min-width: 1900px) {
+  #main-content { display: grid; grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr); gap: 0 44px; align-items: start; }
+  #main-content > #loading-note, #main-content > .cert-empty-note { grid-column: 1 / -1; }
+  #main-content > section.cert-section { margin-bottom: 0; }
+}
