@@ -341,7 +341,14 @@
       while (i < lines.length && lines[i].trim() && !startsBlock(lines[i], lines[i + 1])) { para.push(lines[i]); i++; }
       var joined = para.map(function (l) { return l.replace(/[ \t]+$/, ""); }).join("\n");
       var only = para.length === 1 ? safeUrl(para[0].trim()) : null;
+      // A line that is only a link, [Title](https://...), is a card that shows the title too.
+      var titled = para.length === 1 ? /^\[([^\[\]\n]{1,300})\]\(([^()\s]{1,2000})\)$/.exec(para[0].trim()) : null;
+      var titledHref = titled && /^https?:\/\//i.test(titled[2]) ? safeUrl(titled[2]) : null;
       if (only && /^https?:\/\//i.test(para[0].trim())) blocks.push({ t: "card", href: only });
+      else if (titledHref) {
+        var cardTitle = titled[1].replace(/\\([\\`*_{}\[\]()#+\-.!|~>])/g, "$1").trim();
+        blocks.push(cardTitle && cardTitle !== titled[2] && cardTitle !== titledHref ? { t: "card", href: titledHref, title: cardTitle } : { t: "card", href: titledHref });
+      }
       else blocks.push({ t: "p", c: parseInline(joined, 0) });
     }
     return blocks;
@@ -494,6 +501,7 @@
             a.setAttribute("rel", "noopener noreferrer nofollow");
             a.setAttribute("target", "_blank");
             var u = new URL(n.href);
+            if (n.title) el("span", "lc-title", a).textContent = n.title;
             el("span", "lc-host", a).textContent = u.hostname.replace(/^www\./, "");
             var rest = (u.pathname === "/" ? "" : u.pathname) + u.search;
             el("span", "lc-path", a).textContent = rest.length > 80 ? rest.slice(0, 79) + "…" : rest || n.href;
