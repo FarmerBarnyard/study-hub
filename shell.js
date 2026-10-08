@@ -2,7 +2,7 @@
 // light/dark switch, Settings), page-background layer and the Settings panel.
 //
 // A page supplies only its own content, inside <main id="page" class="content">,
-// and says which page it is with <body data-shell="overview|ops|study|kb|campaign|stocks">.
+// and says which page it is with <body data-shell="overview|ops|chat|study|kb|campaign|stocks">.
 // This script wraps that content in the shell.
 //
 // A generated page whose body this repo does not author (the Stocks dashboard,
@@ -42,6 +42,8 @@
   var PAGES = [
     { id: "overview", title: "Overview", group: "", icon: "home", path: "", local: "./" },
     { id: "ops", title: "Ops board", group: "Work", icon: "board", path: "ops.html", local: "ops.html" },
+    // ownerOnly: shown only to the hub owner (Theme.who says owner === true), and hidden until that is known.
+    { id: "chat", title: "Claude", group: "Work", icon: "chat", path: "chat.html", local: "chat.html", ownerOnly: true },
     // `app` is the group-backed app a link needs; a signed-in person whose groups
     // do not include it does not see the link (see Theme.who in themes.js).
     { id: "study", title: "Study", group: "Sites", icon: "book", url: "https://study.barnyard.site/", app: "study" },
@@ -53,6 +55,7 @@
   var ICONS = {
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
     board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
+    chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-7l-5 4v-4H6a2 2 0 01-2-2z"/><path d="M8 9h8M8 12h5"/>',
     book: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',
     map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
@@ -98,6 +101,7 @@
     if (/^campaign\./.test(host)) return "campaign";
     if (/^stocks\./.test(host)) return "stocks";
     if (/(^|\/)ops\.html$/.test(location.pathname)) return "ops";
+    if (/(^|\/)chat\.html$/.test(location.pathname)) return "chat";
     return "overview";
   }
 
@@ -111,7 +115,11 @@
   // Which pages this person can use (Theme.who is filled in a moment after load;
   // until it is known, and whenever it cannot be known, every link shows).
   var navLinks = {};
-  function pageAllowed(p) { return !Theme.who || Theme.who.allows(Theme.who.get(), p.app); }
+  function pageAllowed(p) {
+    // An owner-only page is shown only once the person is known to be the owner (it fails closed, unlike the app links).
+    if (p.ownerOnly) { var s = Theme.who && Theme.who.get(); return !!s && s.owner === true; }
+    return !Theme.who || Theme.who.allows(Theme.who.get(), p.app);
+  }
   function applyWho() {
     PAGES.forEach(function (p) { if (navLinks[p.id]) navLinks[p.id].hidden = !pageAllowed(p); });
   }
@@ -162,7 +170,8 @@
       if (p.id === "ops") { els.badge = h("span", "badge", "0"); els.badge.hidden = true; a.appendChild(els.badge); }
       var abs = new URL(a.href, location.href);
       if (abs.origin !== location.origin) a.appendChild(svg("ext", "ext"));
-      if (p.app) navLinks[p.id] = a;
+      if (p.app || p.ownerOnly) navLinks[p.id] = a;
+      if (p.ownerOnly) a.hidden = !pageAllowed(p);
       nav.appendChild(a);
     });
     side.appendChild(nav);
