@@ -489,6 +489,7 @@
       var pin = $("nb-pin");
       pin.setAttribute("aria-pressed", n.pinned ? "true" : "false");
       pin.textContent = n.pinned ? "Unpin" : "Pin";
+      $("nb-publish").setAttribute("href", "knowledgebase.html#/new?note=" + encodeURIComponent(n.id));
       autoMode(!!(n.body && n.body.trim()));
       renderPreview();
       renderBacklinks();

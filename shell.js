@@ -2,7 +2,7 @@
 // light/dark switch, Settings), page-background layer and the Settings panel.
 //
 // A page supplies only its own content, inside <main id="page" class="content">,
-// and says which page it is with <body data-shell="overview|ops|study|campaign|stocks">.
+// and says which page it is with <body data-shell="overview|ops|study|kb|campaign|stocks">.
 // This script wraps that content in the shell.
 //
 // A generated page whose body this repo does not author (the Stocks dashboard,
@@ -45,6 +45,7 @@
     // `app` is the group-backed app a link needs; a signed-in person whose groups
     // do not include it does not see the link (see Theme.who in themes.js).
     { id: "study", title: "Study", group: "Sites", icon: "book", url: "https://study.barnyard.site/", app: "study" },
+    { id: "kb", title: "Knowledgebase", group: "Sites", icon: "bulb", url: "https://study.barnyard.site/knowledgebase.html", app: "study" },
     { id: "campaign", title: "Campaign", group: "Sites", icon: "map", url: "https://campaign.barnyard.site/", app: "campaign" },
     { id: "stocks", title: "Stocks", group: "Sites", icon: "chart", url: "https://stocks.barnyard.site/" }
   ];
@@ -54,6 +55,7 @@
     board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
     book: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',
     map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+    bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
     chart: '<path d="M3 20h18"/><path d="M5 15l4-5 4 3 6-8"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',

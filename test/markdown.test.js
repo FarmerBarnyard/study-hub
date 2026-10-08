@@ -126,6 +126,18 @@ test("[[wiki links]] point at an existing note, or show as missing", function ()
   assert.ok(out.indexOf('class="wiki missing"') !== -1);
 });
 
+test("[[links]] can point at Knowledgebase articles, with the page's own address and tooltip", function () {
+  var cx = {
+    findNote: function (t) { return t === "Entra" ? "ka_abcd1234" : t === "Evil" ? "javascript:alert(1)" : null; },
+    hrefFor: function (id) { return "#/a/" + id; },
+    missingTitle: function (t) { return "Not in the library: " + t; },
+  };
+  var out = render("[[Entra]] [[Evil]] [[Gone]]", cx);
+  assert.ok(out.indexOf('href="#/a/ka_abcd1234"') !== -1);
+  assert.ok(out.indexOf('href="javascript') === -1 && out.indexOf("#/a/javascript") === -1, "an id that is not note-shaped never becomes a link");
+  assert.ok(out.indexOf('title="Not in the library: Gone"') !== -1);
+});
+
 test("lists: bullets, numbers with a start, nesting and tasks", function () {
   assert.strictEqual(render("- a\n- b\n  - c\n- d"), "<ul><li><p>a</p></li><li><p>b</p><ul><li><p>c</p></li></ul></li><li><p>d</p></li></ul>");
   assert.ok(render("3. x\n4. y").indexOf('<ol start="3">') !== -1);

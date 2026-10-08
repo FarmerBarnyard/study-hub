@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.barnyard.site; style-src 'self'; script-src 'self'; img-src 'self' https://api.barnyard.site; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none';">
+<title>Knowledgebase &mdash; Barnyard Study</title>
+<link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="notes.css">
+<link rel="stylesheet" href="kb.css">
+<script src="themes.js"></script>
+</head>
+<body data-shell="kb" data-wide>
+
+<main id="page" class="content">
+
+  <noscript><p class="cert-empty-note">The Knowledgebase needs JavaScript.</p></noscript>
+
+  <div id="kb-gate" class="nb-gate" hidden>
+    <p id="kb-gate-msg"></p>
+    <p><a id="kb-gate-login" class="btn" href="https://api.barnyard.site/auth/login" hidden>Log in</a></p>
+  </div>
+
+  <div id="kb" class="kb" hidden>
+    <div id="kb-view" class="kb-view"></div>
+  </div>
+
+  <dialog id="kb-dialog" class="nb-dialog" aria-labelledby="kb-dialog-title">
+    <form method="dialog" class="nb-dialog-in">
+      <h2 id="kb-dialog-title"></h2>
+      <div id="kb-dialog-body"></div>
+      <div class="nb-dialog-foot" id="kb-dialog-foot"><button type="button" class="btn" id="kb-dialog-close">Close</button></div>
+    </form>
+  </dialog>
+
+  <p class="dim study-footer">Articles here are copies of notes that someone chose to publish. Everyone who can sign in to the study site can read them; your private notes stay private until you publish a copy. Links are shown as cards from the address alone &mdash; nothing is fetched from other sites while you read. The optional summary button sends the article text to this site&rsquo;s own AI model (not an outside service).</p>
+
+</main>
+
+<script src="shell.js"></script>
+<script src="auth-gate.js"></script>
+<script src="markdown.js"></script>
+<script src="kb-format.js"></script>
+<script src="kb.js"></script>
+</body>
+</html>

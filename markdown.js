@@ -28,7 +28,7 @@
   var MAX_INLINE_CHARS = 20000; // a single paragraph longer than this is shown as plain text
   var CALLOUTS = { NOTE: "Note", TIP: "Tip", IMPORTANT: "Important", WARNING: "Warning", CAUTION: "Caution" };
   var IMAGE_ID = /^im_[a-z0-9]{8}$/;
-  var NOTE_ID = /^nt_[a-z0-9]{8}$/;
+  var NOTE_ID = /^(nt|ka)_[a-z0-9]{8}$/;   // a note in the notebook, or an article in the Knowledgebase
 
   // ---------------------------------------------------------------- safe URLs
 
@@ -378,7 +378,9 @@
 
   // cx: {
   //   imageUrl(id) -> string        where an uploaded image is fetched from
-  //   findNote(title) -> id | null  which note a [[title]] means
+  //   findNote(title) -> id | null  which note (or article) a [[title]] means
+  //   hrefFor(id) -> string         where that link goes (default "#<id>")
+  //   missingTitle(title) -> string the tooltip for a [[title]] that matches nothing
   // }
   function toDom(tree, doc, cx) {
     cx = cx || {};
@@ -420,12 +422,12 @@
             var id = cx.findNote ? cx.findNote(n.title) : null;
             if (id && NOTE_ID.test(id)) {
               var w = el("a", "wiki", parent);
-              w.setAttribute("href", "#" + id);
+              w.setAttribute("href", cx.hrefFor ? cx.hrefFor(id) : "#" + id);
               w.setAttribute("data-note", id);
               w.textContent = n.label;
             } else {
               var m = el("span", "wiki missing", parent);
-              m.setAttribute("title", "No note called “" + n.title + "” yet — click to create it");
+              m.setAttribute("title", cx.missingTitle ? cx.missingTitle(n.title) : "No note called “" + n.title + "” yet — click to create it");
               m.setAttribute("data-wiki", n.title);
               m.textContent = n.label;
             }
