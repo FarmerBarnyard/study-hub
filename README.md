@@ -73,6 +73,17 @@ This page now sits in the same shell as the dashboard: a left sidebar (Overview,
 - `style.css` is now only this page's own layout (certification rows, status dots, revision notes, the generate button).
 - The Notion sync note turns red and says how old the snapshot is once it passes 14 days (`describeSync` in `app.js`, tested), because a stale list looks exactly like a current one.
 - Script order matters: `shell.js` before `auth-gate.js` (it creates `#auth-status`), `themes.js` in `<head>`.
+
+## My notes: the private notebook (`notes.html`, 2026-10-08)
+
+A Notion-free place to take notes, written in Markdown with a live preview. Notes belong to the signed-in person and are stored by the Worker (`api.barnyard.site/notebook/*`, a Durable Object per person; see `ClaudeRepo/cloudflare-worker/README.md` "Study notebook"). Nothing is stored in this repo and nothing is public.
+
+- `markdown.js` renders note text with DOM nodes only (no `innerHTML`): headings, lists, task lists, tables, code, quotes and callouts (`> [!NOTE]`, TIP, IMPORTANT, WARNING, CAUTION), and `[[links]]` between notes. Only http, https and mailto links are live. A web address on its own line becomes a link card (host and path only; nothing is fetched). Images are the notebook's own (`![alt](img:im_xxxxxxxx)`, loaded from the Worker with the login cookie); an image pointing at another site is shown as a link, so reading a note never calls a third party.
+- `notes.js` is the editor: tree with folders, pinned notes, search, tags, autosave with revision checking (a conflict never overwrites), history, trash, move, outline, backlinks, image paste/drop/upload, a `/` menu and `[[` autocomplete, download a note as `.md`, download everything, delete the whole notebook (typed confirmation).
+- Tests: `node test/markdown.test.js` (including hostile-input cases) and `node test/notes.test.js`.
+- The page CSP is `img-src 'self' https://api.barnyard.site` (images come from the Worker) and `connect-src 'self' https://api.barnyard.site`.
+- A password or key in a note is refused by the Worker (`secret_detected`) and the page says so; personal details are flagged on the note rather than refused.
+
 ## Deploy
 
 GitHub Pages, custom domain `study.barnyard.site` (see `CNAME`), DNS + TLS via Cloudflare (proxied CNAME on the `barnyard.site` zone, matching `dashboard`/`stocks`/`api`'s existing setup).

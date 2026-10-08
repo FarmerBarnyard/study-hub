@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.barnyard.site; style-src 'self'; script-src 'self'; img-src 'self' https://api.barnyard.site; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none';">
+<title>Notes &mdash; Barnyard Study</title>
+<link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="notes.css">
+<script src="themes.js"></script>
+</head>
+<body data-shell="study">
+
+<main id="page" class="content">
+
+  <div class="page-head">
+    <div>
+      <h1>Notes</h1>
+      <p>Your private study notebook. Written in Markdown, saved to your account as you type.</p>
+    </div>
+    <p class="nb-back"><a href="./">&larr; Study</a></p>
+  </div>
+
+  <noscript><p class="cert-empty-note">The notebook needs JavaScript.</p></noscript>
+
+  <div id="nb-gate" class="nb-gate" hidden>
+    <p id="nb-gate-msg"></p>
+    <p><a id="nb-gate-login" class="btn" href="https://api.barnyard.site/auth/login" hidden>Log in</a></p>
+  </div>
+
+  <div id="nb" class="nb" hidden>
+
+    <aside class="nb-side" id="nb-side" aria-label="Notebook">
+      <div class="nb-side-top">
+        <label class="sr-only" for="nb-search">Search notes</label>
+        <input id="nb-search" type="search" placeholder="Search notes" autocomplete="off" maxlength="100">
+        <div class="nb-side-actions">
+          <button type="button" class="btn" id="nb-new-note">New note</button>
+          <button type="button" class="btn" id="nb-new-folder">New folder</button>
+        </div>
+      </div>
+      <nav id="nb-tree" class="nb-tree" aria-label="Notes"></nav>
+      <div class="nb-side-foot">
+        <button type="button" class="nb-link" id="nb-open-trash">Trash</button>
+        <button type="button" class="nb-link" id="nb-open-notebook">Notebook</button>
+      </div>
+    </aside>
+
+    <section class="nb-main" aria-label="Editor">
+      <button type="button" class="btn nb-side-toggle" id="nb-side-toggle" aria-expanded="true" aria-controls="nb-side">Notes list</button>
+
+      <div id="nb-empty" class="nb-empty">
+        <h2>Pick a note, or start a new one</h2>
+        <p>Use <kbd>/</kbd> at the start of a line for headings, lists, tables and callouts, and <kbd>[[</kbd> to link to another note. Paste or drop a screenshot to add an image. A web address on its own line becomes a link card.</p>
+      </div>
+
+      <div id="nb-editor" class="nb-editor" hidden>
+        <div class="nb-bar">
+          <label class="sr-only" for="nb-title">Title</label>
+          <input id="nb-title" class="nb-title" type="text" maxlength="200" autocomplete="off" placeholder="Untitled">
+          <span id="nb-status" class="nb-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="nb-bar nb-bar-sub">
+          <label class="nb-tags-label" for="nb-tags">Tags</label>
+          <input id="nb-tags" class="nb-tags" type="text" maxlength="400" autocomplete="off" placeholder="azure, identity">
+          <span class="nb-spacer"></span>
+          <div class="nb-modes" role="group" aria-label="View">
+            <button type="button" data-mode="edit" aria-pressed="false">Write</button>
+            <button type="button" data-mode="split" aria-pressed="true">Split</button>
+            <button type="button" data-mode="preview" aria-pressed="false">Read</button>
+          </div>
+          <button type="button" class="btn" id="nb-pin" aria-pressed="false">Pin</button>
+          <button type="button" class="btn" id="nb-move">Move</button>
+          <button type="button" class="btn" id="nb-history">History</button>
+          <button type="button" class="btn" id="nb-download">Download .md</button>
+          <button type="button" class="btn nb-danger" id="nb-delete">Delete</button>
+        </div>
+        <div id="nb-conflict" class="nb-banner" role="alert" hidden></div>
+        <div class="nb-toolbar" id="nb-toolbar" role="toolbar" aria-label="Formatting"></div>
+        <div id="nb-pop" class="nb-pop" role="listbox" aria-label="Suggestions" hidden></div>
+        <div class="nb-panes" id="nb-panes" data-mode="split">
+          <label class="sr-only" for="nb-text">Note text (Markdown)</label>
+          <textarea id="nb-text" class="nb-text" spellcheck="true" placeholder="Start writing&hellip;"></textarea>
+          <div class="nb-prev-wrap">
+            <details id="nb-outline" class="nb-outline" hidden><summary>Outline</summary><ol id="nb-outline-list"></ol></details>
+            <article id="nb-preview" class="md" aria-label="Preview"></article>
+            <section id="nb-backlinks" class="nb-backlinks" hidden><h2>Linked from</h2><ul id="nb-backlinks-list"></ul></section>
+          </div>
+        </div>
+        <input id="nb-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+      </div>
+
+      <div id="nb-folder" class="nb-folder" hidden>
+        <div class="nb-bar">
+          <label class="sr-only" for="nb-folder-title">Folder name</label>
+          <input id="nb-folder-title" class="nb-title" type="text" maxlength="200" autocomplete="off">
+          <span id="nb-folder-status" class="nb-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="nb-bar nb-bar-sub">
+          <button type="button" class="btn" id="nb-folder-note">New note here</button>
+          <button type="button" class="btn" id="nb-folder-sub">New folder here</button>
+          <button type="button" class="btn" id="nb-folder-move">Move</button>
+          <button type="button" class="btn nb-danger" id="nb-folder-delete">Delete</button>
+        </div>
+        <ul id="nb-folder-list" class="nb-folder-list"></ul>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="nb-dialog" class="nb-dialog" aria-labelledby="nb-dialog-title">
+    <form method="dialog" class="nb-dialog-in">
+      <h2 id="nb-dialog-title"></h2>
+      <div id="nb-dialog-body"></div>
+      <div class="nb-dialog-foot"><button type="button" class="btn" id="nb-dialog-close">Close</button></div>
+    </form>
+  </dialog>
+
+  <p class="dim study-footer">Your notes are stored privately against your login on this site&rsquo;s own server (Cloudflare), not in Notion or any other service. Links are shown as cards from the address alone &mdash; nothing is fetched from other sites while you read. Images you add are stored privately too. You can download everything or delete your whole notebook from the Notebook menu.</p>
+
+</main>
+
+<script src="shell.js"></script>
+<script src="auth-gate.js"></script>
+<script src="markdown.js"></script>
+<script src="notes.js"></script>
+</body>
+</html>

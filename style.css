@@ -67,3 +67,6 @@ section.cert-section { margin-bottom: 40px; }
   .revision-notes summary { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { .revision-notes summary::before { transition: none; } }
+
+.page-head .nb-open{font-weight:600;align-self:flex-end;font-size:14px;}
+.page-head .nb-open a{color:var(--amber);}
