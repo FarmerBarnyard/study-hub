@@ -63,7 +63,7 @@ This has no CI pipeline (unlike ClaudeRepo's market-dashboard pipeline) — refr
 4. Update `data.json`'s top-level `generated` date.
 5. Commit and push to `main` — GitHub Pages redeploys automatically.
 
-This was last done by hand on 2026-08-23 (initial build). It produces the **pre-authored baseline** shown to any visitor with no localStorage cache of their own — the "Generate/Regenerate notes" button above is the complementary on-demand path for the account owner's own browser, and doesn't require this manual process to be repeated on a schedule. A scheduled agent-driven refresh of this baseline (step 1-2 above) is still worth doing periodically to keep the ongoing/completed split itself current — check the Claude PM Workspace's Progress Planner entry for this project for whether that's been set up.
+This was done by hand on 2026-08-23 (initial build) and again on 2026-10-08 (checked every row of the Knowledgebase: no status changes; the SC-300 page was edited in Notion on 2026-09-25 but already matched the notes apart from the identity-capabilities detail, now added; AZ-900 and AZ-104 pages are still empty). It produces the **pre-authored baseline** shown to any visitor with no localStorage cache of their own — the "Generate/Regenerate notes" button above is the complementary on-demand path for the account owner's own browser, and doesn't require this manual process to be repeated on a schedule. A scheduled agent-driven refresh of this baseline (step 1-2 above) is still worth doing periodically to keep the ongoing/completed split itself current — check the Claude PM Workspace's Progress Planner entry for this project for whether that's been set up.
 
 ## Shared shell and themes (2026-10-08)
 
