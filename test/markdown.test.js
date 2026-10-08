@@ -93,6 +93,22 @@ test("a web address alone on a line becomes a link card showing host and path on
   assert.ok(render("text https://example.com").indexOf("linkcard") === -1);
 });
 
+test("a line that is only [Title](web address) is a card showing the title, host and path", function () {
+  var out = render("[Configure and manage roles - Training](https://learn.microsoft.com/en-gb/training/modules/x/3-roles)");
+  assert.ok(out.indexOf('class="linkcard"') !== -1);
+  assert.ok(out.indexOf('<span class="lc-title">Configure and manage roles - Training</span>') !== -1);
+  assert.ok(out.indexOf("learn.microsoft.com") !== -1 && out.indexOf("/en-gb/training/modules/x/3-roles") !== -1);
+  // a title that is just the address adds nothing
+  assert.ok(render("[https://example.com](https://example.com)").indexOf("lc-title") === -1);
+  // inside a sentence it stays an ordinary link; non-web addresses never become cards
+  assert.ok(render("See [docs](https://example.com) now").indexOf("linkcard") === -1);
+  assert.ok(render("[x](javascript:alert(1))").indexOf("linkcard") === -1);
+  assert.ok(render("[x](mailto:a@b.co)").indexOf("linkcard") === -1);
+  // the title is text, never markup
+  var hostile = render("[<img src=x onerror=alert(1)>](https://example.com)");
+  assert.ok(hostile.indexOf("<img") === -1);
+});
+
 test("notebook images load from the Worker with the login cookie; other images become links", function () {
   var out = render("![Diagram](img:im_abcd1234)");
   assert.ok(out.indexOf('crossorigin="use-credentials"') !== -1);

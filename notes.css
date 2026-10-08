@@ -126,6 +126,8 @@ kbd { font: 12px var(--font-mono); padding: 1px 6px; border: 1px solid var(--lin
 .md .linkcard { display: flex; flex-direction: column; gap: 2px; margin: .7em 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); text-decoration: none; color: var(--fg); }
 .md .linkcard:hover { border-color: var(--accent); }
 .md .lc-host { font-weight: 600; color: var(--fg-strong); }
+.md .lc-title { font-weight: 600; color: var(--fg-strong); }
+.md .lc-title + .lc-host { font-weight: 400; font-size: 12.5px; color: var(--accent); }
 .md .lc-path { font-size: 12.5px; color: var(--fg-dim); overflow-wrap: anywhere; }
 .md a.wiki { text-decoration: none; border-bottom: 1px dashed var(--accent); }
 .md .wiki.missing, .nb-backlinks .wiki.missing { color: var(--fg-dim); border-bottom: 1px dashed var(--fg-dim); cursor: pointer; }
