@@ -86,9 +86,9 @@
           <input id="nb-tags" class="nb-tags" type="text" maxlength="400" autocomplete="off" placeholder="azure, identity">
           <span class="nb-spacer"></span>
           <div class="nb-modes" role="group" aria-label="View">
-            <button type="button" data-mode="edit" aria-pressed="false">Write</button>
-            <button type="button" data-mode="split" aria-pressed="true">Split</button>
-            <button type="button" data-mode="preview" aria-pressed="false">Read</button>
+            <button type="button" data-mode="edit" aria-pressed="false" title="The raw Markdown text only">Write</button>
+            <button type="button" data-mode="split" aria-pressed="true" title="Text on the left, formatted note on the right">Split</button>
+            <button type="button" data-mode="preview" aria-pressed="false" title="The formatted note only (double-click it to edit)">Read</button>
           </div>
           <button type="button" class="btn" id="nb-pin" aria-pressed="false">Pin</button>
           <button type="button" class="btn" id="nb-move">Move</button>
@@ -97,6 +97,7 @@
           <button type="button" class="btn nb-danger" id="nb-delete">Delete</button>
         </div>
         <div id="nb-conflict" class="nb-banner" role="alert" hidden></div>
+        <p id="nb-modehint" class="nb-modehint" hidden>This is the raw text, so images, code blocks and link cards show as plain Markdown. <button type="button" class="nb-link" id="nb-modehint-btn">Show it formatted</button></p>
         <div class="nb-toolbar" id="nb-toolbar" role="toolbar" aria-label="Formatting"></div>
         <div id="nb-pop" class="nb-pop" role="listbox" aria-label="Suggestions" hidden></div>
         <div class="nb-panes" id="nb-panes" data-mode="split">

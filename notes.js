@@ -453,14 +453,20 @@
     });
   }
 
-  function setMode(mode) {
+  // How the note is shown: Write (the raw Markdown only), Split (text and formatted side by side) or
+  // Read (formatted only). Only a choice you make is remembered; otherwise a note that has text opens
+  // formatted (side by side on a wide window, Read on a narrow one) and an empty one opens ready to type.
+  function setMode(mode, chosen) {
     state.mode = mode;
     $("nb-panes").setAttribute("data-mode", mode);
     Array.prototype.forEach.call(document.querySelectorAll(".nb-modes button"), function (b) {
       b.setAttribute("aria-pressed", b.getAttribute("data-mode") === mode ? "true" : "false");
     });
-    store("nb.mode", mode);
+    $("nb-modehint").hidden = mode !== "edit";
+    if (chosen) { state.modeChosen = true; store("nb.view", mode); }
   }
+  function wideEnough() { return !root.matchMedia || root.matchMedia("(min-width: 1100px)").matches; }
+  function autoMode(hasText) { if (!state.modeChosen) setMode(hasText ? (wideEnough() ? "split" : "preview") : "edit", false); }
 
   function applyNote(data) {
     state.cur = data;
@@ -483,6 +489,7 @@
       var pin = $("nb-pin");
       pin.setAttribute("aria-pressed", n.pinned ? "true" : "false");
       pin.textContent = n.pinned ? "Unpin" : "Pin";
+      autoMode(!!(n.body && n.body.trim()));
       renderPreview();
       renderBacklinks();
     }
@@ -1206,9 +1213,12 @@
   }
 
   function init() {
-    var saved = store("nb.mode");
+    // "nb.view" holds only a view you picked yourself. (The old "nb.mode" also stored the automatic default,
+    // which left narrow windows stuck on raw text, so it is no longer read.)
+    var saved = store("nb.view");
     buildToolbar();
-    setMode(saved === "edit" || saved === "preview" || saved === "split" ? saved : (root.matchMedia && root.matchMedia("(max-width: 900px)").matches ? "edit" : "split"));
+    if (saved === "edit" || saved === "preview" || saved === "split") setMode(saved, true);
+    else setMode(wideEnough() ? "split" : "preview", false);
     try { state.expanded = JSON.parse(store("nb.open") || "{}") || {}; } catch (e) { state.expanded = {}; }
 
     $("nb-new-note").addEventListener("click", function () { newNote(); });
@@ -1340,7 +1350,14 @@
     $("nb-title").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); textarea().focus(); } });
 
     Array.prototype.forEach.call(document.querySelectorAll(".nb-modes button"), function (b) {
-      b.addEventListener("click", function () { setMode(b.getAttribute("data-mode")); });
+      b.addEventListener("click", function () { setMode(b.getAttribute("data-mode"), true); });
+    });
+    $("nb-modehint-btn").addEventListener("click", function () { setMode(wideEnough() ? "split" : "preview", true); });
+    // Double-click the formatted view to edit: the raw text appears beside it (or instead, on a narrow window).
+    $("nb-preview").addEventListener("dblclick", function (e) {
+      if (state.mode !== "preview" || (e.target.closest && e.target.closest("a, button, input, img"))) return;
+      setMode(wideEnough() ? "split" : "edit", true);
+      textarea().focus();
     });
     $("nb-pin").addEventListener("click", function () { save({ pinned: !state.cur.note.pinned }); });
     $("nb-move").addEventListener("click", function () { moveDialog(); });
