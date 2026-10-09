@@ -148,4 +148,64 @@ test("polling is quick at first and slower once settled or only queued", functio
   assert.strictEqual(k.pollDelayMs(1, "queued"), 5000);
 });
 
+// ---- picking a job up again after leaving the page ----------------------------------------------
+
+var NOW = 1800000000000;
+function memo(over) {
+  return Object.assign({
+    v: 1, id: "cj_abcd1234", type: "rewrite", startedAt: NOW - 12 * 60000, mode: "new", editId: null, rev: null, alsoSummary: true, todo: [0, 2, 3], skipped: 1,
+    draft: { title: "Entra basics", summary: "", tags: ["sc-300"], body: "# A\n\nSome text.\n", accent: null }, sources: ["Note one"],
+  }, over || {});
+}
+var read = function (m, now) { return k.readMemo(typeof m === "string" ? m : JSON.stringify(m), now === undefined ? NOW : now); };
+
+test("a remembered job reads back exactly, and only what the page stores is kept", function () {
+  var m = read(memo());
+  assert.strictEqual(m.id, "cj_abcd1234");
+  assert.deepStrictEqual(m.todo, [0, 2, 3]);
+  assert.strictEqual(m.draft.title, "Entra basics");
+  assert.strictEqual(m.alsoSummary, true);
+  assert.strictEqual(m.skipped, 1);
+  var extra = read(Object.assign(memo(), { secret: "x", draft: Object.assign(memo().draft, { extra: 1 }) }));
+  assert.deepStrictEqual(Object.keys(extra).sort(), ["alsoSummary", "draft", "editId", "id", "mode", "rev", "skipped", "sources", "startedAt", "todo", "type", "v"]);
+  assert.deepStrictEqual(Object.keys(extra.draft).sort(), ["accent", "body", "summary", "tags", "title"]);
+  var edit = read(memo({ mode: "edit", editId: "ka_abcd1234", rev: 4 }));
+  assert.strictEqual(edit.editId, "ka_abcd1234");
+  assert.strictEqual(edit.rev, 4);
+  assert.strictEqual(read(memo({ type: "summary", todo: [] })).type, "summary");
+});
+
+test("a remembered job is dropped when it is old, from the future, or not in the stored shape", function () {
+  assert.strictEqual(read(memo({ startedAt: NOW - k.MEMO_MAX_AGE_MS - 1 })), null, "older than three hours");
+  assert.ok(read(memo({ startedAt: NOW - k.MEMO_MAX_AGE_MS + 1000 })));
+  assert.strictEqual(read(memo({ startedAt: NOW + 3600000 })), null);
+  [null, "", "not json", "[]", "5", JSON.stringify({ v: 2 })].forEach(function (raw) { assert.strictEqual(read(raw), null, String(raw)); });
+  [{ v: 2 }, { id: "x" }, { id: "cj_ABCD1234" }, { id: "cj_abcd12345" }, { type: "other" }, { mode: "edit", editId: "nope" }, { mode: "sideways" },
+    { todo: [] }, { todo: [-1] }, { todo: [1.5] }, { todo: new Array(201).fill(1) }, { todo: "0" }, { draft: null }, { draft: { title: 5, summary: "", tags: [], body: "", accent: null } },
+    { draft: { title: "t", summary: "", tags: [5], body: "x", accent: null } }, { draft: { title: "t", summary: "", tags: [], body: "x", accent: "red" } },
+    { draft: { title: "t", summary: "", tags: [], body: "x".repeat(300001), accent: null } }, { sources: [5] }].forEach(function (bad) {
+    assert.strictEqual(read(memo(bad)), null, JSON.stringify(bad).slice(0, 80));
+  });
+  assert.strictEqual(read("x".repeat(400001)), null, "too large to be what the page stored");
+});
+
+test("the banner line names the job and how long ago, and never shows the draft's text", function () {
+  var line = k.memoLine(read(memo()), NOW);
+  assert.match(line, /^AI rewrite of “Entra basics” started 12 min ago\./);
+  assert.match(k.memoLine(read(memo({ type: "summary", todo: [] })), NOW), /^AI summary of/);
+  assert.ok(line.indexOf("Some text") < 0);
+  assert.ok(k.memoLine(read(memo({ draft: { title: "t".repeat(120), summary: "", tags: [], body: "x", accent: null } })), NOW).length < 160, "a long title is cut");
+});
+
+test("leaving the page no longer cancels the job; finishing or discarding drops the memory", function () {
+  var fs = require("fs");
+  var js = fs.readFileSync(path.join(__dirname, "..", "kb.js"), "utf8");
+  var watch = js.slice(js.indexOf("function watchJob"), js.indexOf("function paintJob"));
+  assert.ok(/aiRun\.isConnected\) \{ end\(\{ ok: false, left: true/.test(watch), "leaving ends the watch with left: true");
+  assert.ok(!/isConnected\) \{ cancel\(\)/.test(watch), "leaving does not cancel");
+  assert.strictEqual((js.match(/if \(res\.left\) return;\s*dropMemo\(\);/g) || []).length, 2, "both watchers keep the memory on leaving and drop it on any other end");
+  assert.ok(js.indexOf('kb("POST", "/ai-job/cancel", { id: memo.id })') >= 0, "Discard cancels the job");
+  assert.ok(/sessionStorage/.test(js) && !/localStorage/.test(js.slice(js.indexOf("function saveMemo"), js.indexOf("function saveMemo") + 400)), "kept in this tab only");
+});
+
 console.log("\n" + passed + " passed");
