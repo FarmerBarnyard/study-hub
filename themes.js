@@ -438,7 +438,7 @@
   // group check, so this is presentation, not security. It fails open: if the
   // session is unknown (signed out, an old Worker, a network error) nothing is hidden.
   //
-  //   who = { authenticated: true, owner: true|false|null, apps: ["hub","campaign"]|null }
+  //   who = { authenticated: true, owner: true|false|null, apps: ["hub","campaign"]|null, chat: true|false }
   //       | { authenticated: false }
   // `owner` is null until the Worker knows who the owner is. A signed-in result is
   // kept in sessionStorage for a minute so moving between pages does not refetch.
@@ -452,7 +452,8 @@
     if (!j || j.authenticated !== true) return { authenticated: false };
     var apps = null;
     if (Array.isArray(j.apps)) apps = j.apps.filter(function (a) { return typeof a === "string" && a.length <= 20; }).slice(0, 10);
-    return { authenticated: true, owner: j.owner === true ? true : j.owner === false ? false : null, apps: apps };
+    // chat: may this person use the Claude chat (a display hint for the nav; the Worker still checks every request)
+    return { authenticated: true, owner: j.owner === true ? true : j.owner === false ? false : null, apps: apps, chat: j.chat === true };
   }
 
   // May this person use `app` ("study", "campaign")? Anything unknown is allowed.
