@@ -94,4 +94,58 @@ test("error messages are plain, name the problem, and never echo server text", f
   assert.strictEqual(k.describePii(["email", "card", "mystery"]), "email addresses, card numbers, mystery");
 });
 
+
+// ---- the AI help as background jobs ----
+
+test("job errors say what to do, with the offline case spelled out", function () {
+  assert.ok(/offline/.test(k.describeJobError(503, { error: "ai_unavailable", reason: "engine_offline" })));
+  assert.ok(/three AI jobs/.test(k.describeJobError(429, { error: "too_many_jobs" })));
+  assert.ok(/allowance/.test(k.describeJobError(429, { error: "rate_limited" })));
+  assert.ok(/more passages/.test(k.describeJobError(400, { error: "too_many_units" })));
+  assert.strictEqual(k.describeJobError(503, { error: "ai_unavailable" }), k.describeError(503, { error: "ai_unavailable" }), "other errors use the usual wording");
+  assert.strictEqual(k.describeJobError(0, null), "Could not reach the server.");
+});
+
+test("a rewrite sends at most what one job takes and says how many were left out", function () {
+  var todo = [0, 2, 4, 6, 8];
+  assert.deepStrictEqual(k.planRewrite(todo, 3), { take: [0, 2, 4], skipped: 2 });
+  assert.deepStrictEqual(k.planRewrite(todo, 30), { take: todo, skipped: 0 });
+  assert.deepStrictEqual(k.planRewrite(todo), { take: todo, skipped: 0 }, "30 unless told otherwise");
+  assert.strictEqual(k.planRewrite(Array.from({ length: 40 }, function (_, i) { return i; })).take.length, 30);
+  assert.strictEqual(k.planRewrite(todo, 0).take.length, 5, "a nonsense limit falls back to the default");
+});
+
+test("the time left comes from how fast results have arrived, with a sensible first guess", function () {
+  var now = 1000000;
+  assert.strictEqual(k.jobEtaMs({ total: 4, done: 0, failed: 0 }, now), 4 * 150000);
+  assert.strictEqual(k.jobEtaMs({ total: 4, done: 2, failed: 0, startedAt: now - 240000 }, now), 2 * 120000);
+  assert.strictEqual(k.jobEtaMs({ total: 4, done: 1, failed: 1, startedAt: now - 200000 }, now), 2 * 100000, "a failed passage counts as time spent");
+  assert.strictEqual(k.jobEtaMs({ total: 2, done: 2, failed: 0, startedAt: now - 1 }, now), 0);
+});
+
+test("the progress line says what is happening", function () {
+  var now = 1000000;
+  assert.ok(/Waiting for the AI service/.test(k.jobStatusText({ state: "queued", total: 3 }, "rewrite", now)));
+  assert.strictEqual(k.jobStatusText({ state: "running", cancelling: true, total: 3 }, "rewrite", now), "Stopping…");
+  assert.ok(/Writing the summary/.test(k.jobStatusText({ state: "running", total: 1 }, "summary", now)));
+  var t = k.jobStatusText({ state: "running", total: 5, done: 1, failed: 0, startedAt: now - 120000 }, "rewrite", now);
+  assert.ok(/passage 2 of 5/.test(t), t);
+  assert.ok(/about 8 minutes left/.test(t), t);
+  assert.ok(/passage 5 of 5/.test(k.jobStatusText({ state: "running", total: 5, done: 4, failed: 0, startedAt: now - 1 }, "rewrite", now)));
+  assert.ok(/about 1 minute left/.test(k.jobStatusText({ state: "running", total: 5, done: 4, failed: 0, startedAt: now - 60000 }, "rewrite", now)));
+});
+
+test("the progress bar always shows a sliver and never overflows", function () {
+  assert.strictEqual(k.jobFraction({ total: 0 }), 0.05);
+  assert.strictEqual(k.jobFraction({ total: 4, done: 0, failed: 0 }), 0.05);
+  assert.strictEqual(k.jobFraction({ total: 4, done: 2, failed: 0 }), 0.5);
+  assert.strictEqual(k.jobFraction({ total: 4, done: 3, failed: 2 }), 1);
+});
+
+test("polling is quick at first and slower once settled or only queued", function () {
+  assert.strictEqual(k.pollDelayMs(1, "running"), 2000);
+  assert.strictEqual(k.pollDelayMs(10, "running"), 4000);
+  assert.strictEqual(k.pollDelayMs(1, "queued"), 5000);
+});
+
 console.log("\n" + passed + " passed");
