@@ -170,6 +170,8 @@
 .kb-stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; font-size: 13.5px; }
 .kb-stats dt { color: var(--fg-dim); } .kb-stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; color: var(--fg-strong); }
 .kb-note-box2 { padding: 8px 10px; border-radius: 8px; background: var(--info-soft); font-size: 13px; }
+.kb-resume { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 14px; }
+.kb-resume > span { flex: 1 1 260px; }
 .kb-vis { margin-top: 6px; }
 .kb-side h2 { font: 600 15px var(--font-display); color: var(--fg-strong); }
 .kb-status { min-height: 1.4em; font-size: 13px; color: var(--fg-dim); }

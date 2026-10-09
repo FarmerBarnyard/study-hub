@@ -205,7 +205,55 @@
     return attempt < 3 ? 2000 : 4000;
   }
 
+  // ---- picking a background job up again ---------------------------------------------------------
+  // A rewrite takes minutes a passage. If the person leaves the page the job keeps running in the Worker, and
+  // the browser (this tab only, sessionStorage) remembers just enough to offer to carry on: the job's id, its
+  // kind, and the draft as it stood when the job started (the page makes the draft read-only while a job runs,
+  // so that is still the draft the results belong to). It is dropped when the job ends or is discarded, and
+  // after MEMO_MAX_AGE_MS. Nothing here leaves the browser.
+  var MEMO_KEY = "barnyard-kb-ai-job";
+  var MEMO_MAX_AGE_MS = 3 * 3600 * 1000;
+  var MEMO_MAX_CHARS = 400000;
+
+  function isText(v, max) { return typeof v === "string" && v.length <= max; }
+
+  // -> a clean memo, or null for anything that is not exactly what the page stores.
+  function readMemo(raw, now) {
+    if (typeof raw !== "string" || !raw || raw.length > MEMO_MAX_CHARS) return null;
+    var m;
+    try { m = JSON.parse(raw); } catch (e) { return null; }
+    if (!m || typeof m !== "object" || m.v !== 1) return null;
+    if (!/^cj_[a-z0-9]{8}$/.test(m.id)) return null;
+    if (m.type !== "rewrite" && m.type !== "summary") return null;
+    if (!Number.isFinite(m.startedAt) || (now || Date.now()) - m.startedAt > MEMO_MAX_AGE_MS || m.startedAt > (now || Date.now()) + 60000) return null;
+    if (m.mode !== "new" && m.mode !== "edit") return null;
+    if (m.mode === "edit" && !/^ka_[a-z0-9]{8}$/.test(m.editId)) return null;
+    var d = m.draft;
+    if (!d || typeof d !== "object" || !isText(d.title, 400) || !isText(d.summary, 2000) || !isText(d.body, 300000)) return null;
+    if (!Array.isArray(d.tags) || d.tags.length > 30 || !d.tags.every(function (t) { return isText(t, 60); })) return null;
+    if (d.accent !== null && !Number.isInteger(d.accent)) return null;
+    var todo = Array.isArray(m.todo) ? m.todo : [];
+    if (m.type === "rewrite" && (!todo.length || todo.length > 200 || !todo.every(function (i) { return Number.isInteger(i) && i >= 0 && i < 100000; }))) return null;
+    var sources = Array.isArray(m.sources) ? m.sources : [];
+    if (sources.length > 50 || !sources.every(function (s) { return isText(s, 200); })) return null;
+    return {
+      v: 1, id: m.id, type: m.type, startedAt: m.startedAt, mode: m.mode, editId: m.mode === "edit" ? m.editId : null,
+      rev: Number.isFinite(m.rev) ? m.rev : null, alsoSummary: m.alsoSummary === true, todo: todo, skipped: Number.isInteger(m.skipped) && m.skipped > 0 ? m.skipped : 0,
+      draft: { title: d.title, summary: d.summary, tags: d.tags.slice(), body: d.body, accent: d.accent }, sources: sources.slice(),
+    };
+  }
+
+  // "AI rewrite of “Title” started 12 min ago."
+  function memoLine(memo, now) {
+    var what = memo.type === "summary" ? "AI summary" : "AI rewrite";
+    var title = memo.draft.title ? " of “" + memo.draft.title.slice(0, 80) + "”" : "";
+    var mins = Math.max(0, Math.round(((now || Date.now()) - memo.startedAt) / 60000));
+    var ago = mins < 1 ? "just now" : mins < 60 ? mins + " min ago" : Math.round(mins / 60) + " h ago";
+    return what + title + " started " + ago + ". It carries on without this page.";
+  }
+
   var api = {
+    readMemo: readMemo, memoLine: memoLine, MEMO_MAX_AGE_MS: MEMO_MAX_AGE_MS,
     parseRoute: parseRoute, relTime: relTime, tagCounts: tagCounts, filterItems: filterItems, sortItems: sortItems,
     folderPath: folderPath, noteChoices: noteChoices, describeError: describeError, describePii: describePii,
     describeJobError: describeJobError, planRewrite: planRewrite, jobEtaMs: jobEtaMs, jobStatusText: jobStatusText, jobFraction: jobFraction, pollDelayMs: pollDelayMs,
@@ -229,6 +277,42 @@
     cur: null,           // the open article's response
   };
   var comp = null;       // the article composer's state while it is open
+
+  function saveMemo(m) { try { root.sessionStorage.setItem(MEMO_KEY, JSON.stringify(m)); } catch (e) { /* private window: the job just cannot be picked up again */ } }
+  function dropMemo() { try { root.sessionStorage.removeItem(MEMO_KEY); } catch (e) { /* nothing to drop */ } }
+  function loadMemo() {
+    var raw = null;
+    try { raw = root.sessionStorage.getItem(MEMO_KEY); } catch (e) { return null; }
+    var m = readMemo(raw, Date.now());
+    if (!m && raw) dropMemo();
+    return m;
+  }
+
+  // Shown on the library and on the "write an article" page while a job the person left is still remembered.
+  function resumeBanner(parent) {
+    var memo = loadMemo();
+    if (!memo) return;
+    var box = el("div", "kb-note-box2 kb-resume", parent);
+    el("span", "", box, memoLine(memo, Date.now()));
+    btn("Pick it up", "btn kb-primary", box, function () { resumeFromMemo(memo); });
+    btn("Discard", "btn", box, function () {
+      kb("POST", "/ai-job/cancel", { id: memo.id });   // so the engine does not carry on for nobody
+      dropMemo();
+      if (box.parentNode) box.parentNode.removeChild(box);
+    });
+  }
+
+  // Back to the composer with the draft as it was when the job started; the editor then watches the job.
+  function resumeFromMemo(memo) {
+    dropObservers(); dropScroll();
+    comp = { mode: memo.mode, step: "edit", editId: memo.editId, rev: memo.rev === null ? undefined : memo.rev, dirty: true, report: null, sources: memo.sources, draft: memo.draft, resume: memo };
+    var c = fmt.countOf(memo.draft.body);
+    comp.report = { words: c.words, images: c.images, codeBlocks: c.codeBlocks, linkCards: c.linkCards, sections: fmt.headingsOf(memo.draft.body).filter(function (h) { return h.level === 2; }).length, flattenedLinks: [] };
+    setTitle(memo.mode === "edit" ? "Edit " + memo.draft.title : "New article");
+    var want = memo.mode === "edit" ? "#/edit/" + memo.editId : "#/new";
+    if (location.hash !== want) location.hash = want;     // route() sees the composer is already open and leaves it alone
+    renderEditor();
+  }
   var timers = { search: null };
   var observers = [];
 
@@ -415,6 +499,7 @@
     var titleBox = el("div", "", head);
     el("h1", "", titleBox, "Knowledgebase");
     el("p", "", titleBox, "Articles written from study notes. Everyone who can sign in here can read them.");
+    resumeBanner(view);
     var actions = el("div", "kb-head-actions", head);
     btn("Write an article", "btn kb-primary", actions, function () { location.hash = "#/new"; });
     var back = el("a", "btn", actions, "Open Notes");
@@ -674,6 +759,7 @@
     var tb = el("div", "", head);
     el("h1", "", tb, "Write an article");
     el("p", "", tb, "Choose one or more notes. They are copied into a tidy draft that you can edit before anyone else sees it.");
+    resumeBanner(view);
     var back = el("a", "btn", head, "Cancel"); back.href = "#/";
     stepper(view, "pick");
     if (comp.error) { el("p", "kb-error", view, comp.error); return; }
@@ -977,8 +1063,9 @@
     // ---- as background jobs ----------------------------------------------------------------
     // Watches one job until it ends: asks for it every few seconds, hands each answer to onUpdate, and
     // resolves with {ok, data, stopped} (data = the last answer: job, result or results, left). Stop
-    // asks the Worker to cancel and resolves at once with what has arrived; leaving the page cancels too,
-    // so the engine is not left working for nobody.
+    // asks the Worker to cancel and resolves at once with what has arrived. Leaving the page does NOT cancel:
+    // the job carries on and the browser remembers it (see saveMemo) so it can be picked up again; the
+    // answer is {left: true} and nothing more is painted.
     var watching = null;
     function watchJob(id, onUpdate) {
       return new Promise(function (resolve) {
@@ -992,7 +1079,7 @@
         function cancel() { if (!finished) kb("POST", "/ai-job/cancel", { id: id }); }
         function tick() {
           if (finished) return;
-          if (!aiRun.isConnected) { cancel(); end({ ok: false, message: "", data: last }); return; }
+          if (!aiRun.isConnected) { end({ ok: false, left: true, message: "", data: last }); return; }
           if (me.stop) { cancel(); end({ ok: true, stopped: true, data: last }); return; }
           kb("GET", "/ai-job?id=" + encodeURIComponent(id) + (since === null ? "" : "&since=" + since)).then(function (r) {
             if (me.stop) { cancel(); end({ ok: true, stopped: true, data: last }); return; }
@@ -1020,10 +1107,19 @@
     function runSummaryJob(done) {
       aiNote.textContent = "";
       aiRunText.textContent = "Sending the article to the AI service…";
+      var startDraft = { title: d.title, summary: d.summary, tags: d.tags.slice(), body: d.body, accent: d.accent === undefined ? null : d.accent };
       kb("POST", "/ai-job", { type: "summary", title: d.title, body: d.body }).then(function (r) {
         if (r.status !== 202) { aiNote.textContent = describeJobError(r.status, r.json); if (done) done(false); return; }
-        aiStop.hidden = false;
-        watchJob(r.json.job.id, function (data) { paintJob(data, "summary"); }).then(function (res) {
+        saveMemo({ v: 1, id: r.json.job.id, type: "summary", startedAt: Date.now(), mode: comp.mode, editId: comp.editId || null, rev: comp.rev === undefined ? null : comp.rev, alsoSummary: false, todo: [], skipped: 0, draft: startDraft, sources: comp.sources || [] });
+        watchSummary(r.json.job.id, done);
+      });
+    }
+    function watchSummary(jobId, done) {
+      aiStop.hidden = false;
+      {
+        watchJob(jobId, function (data) { paintJob(data, "summary"); }).then(function (res) {
+          if (res.left) return;
+          dropMemo();
           var data = res.data;
           if (res.ok && data && data.result) {
             d.summary = data.result.summary;
@@ -1037,7 +1133,7 @@
           aiNote.textContent = res.stopped ? "Stopped." : !res.ok ? (res.message || "") : (data && data.job.error) || "The model did not give a usable summary. Try again, or write it yourself.";
           if (done) done(false);
         });
-      });
+      }
     }
 
     ai.addEventListener("click", function () {
@@ -1133,11 +1229,20 @@
       var plan = planRewrite(todo, state.me && state.me.limits && state.me.limits.aiRewriteUnits);
       todo = plan.take;
       var prot = todo.map(function (ui) { return fmt.protect(units[ui].text); });
-      var done = 0, kept = 0, applied = {};
+      var startDraft = { title: d.title, summary: d.summary, tags: d.tags.slice(), body: d.body, accent: d.accent === undefined ? null : d.accent };
       setBusy(true);
       aiStop.hidden = true;
       aiRunText.textContent = "Sending " + todo.length + " passage" + (todo.length === 1 ? "" : "s") + " to the AI service…";
       aiFill.style.transform = "scaleX(0.05)";
+      kb("POST", "/ai-job", { type: "rewrite", units: todo.map(function (ui, k) { return { heading: units[ui].heading || d.title, text: prot[k].text }; }) }).then(function (r) {
+        if (r.status !== 202) { setBusy(false); aiNote.textContent = describeJobError(r.status, r.json); return; }
+        saveMemo({ v: 1, id: r.json.job.id, type: "rewrite", startedAt: Date.now(), mode: comp.mode, editId: comp.editId || null, rev: comp.rev === undefined ? null : comp.rev, alsoSummary: !!alsoSummary, todo: todo.slice(), skipped: plan.skipped || 0, draft: startDraft, sources: comp.sources || [] });
+        watchRewrite(r.json.job.id, units, todo, prot, plan, alsoSummary);
+      });
+    }
+    // Watches a rewrite job (a new one, or one picked up again) and applies each passage as it comes back.
+    function watchRewrite(jobId, units, todo, prot, plan, alsoSummary) {
+      var done = 0, kept = 0, applied = {};
       function apply(results) {
         var any = false;
         (results || []).forEach(function (x) {
@@ -1153,10 +1258,11 @@
         });
         if (any) { d.body = fmt.joinUnits(units); text.value = d.body; drawPreview(); comp.dirty = true; }
       }
-      kb("POST", "/ai-job", { type: "rewrite", units: todo.map(function (ui, k) { return { heading: units[ui].heading || d.title, text: prot[k].text }; }) }).then(function (r) {
-        if (r.status !== 202) { setBusy(false); aiNote.textContent = describeJobError(r.status, r.json); return; }
+      {
         aiStop.hidden = false;
-        watchJob(r.json.job.id, function (data) { apply(data.results); paintJob(data, "rewrite"); }).then(function (res) {
+        watchJob(jobId, function (data) { apply(data.results); paintJob(data, "rewrite"); }).then(function (res) {
+          if (res.left) return;
+          dropMemo();
           if (res.data) apply(res.data.results);
           var job = res.data && res.data.job;
           var halted = !res.ok ? (res.message || "") : res.stopped ? "Stopped." : job && job.state === "error" ? (job.error || "The AI service stopped.") : job && job.state === "cancelled" ? "Stopped." : "";
@@ -1176,7 +1282,21 @@
             runSummaryJob(function () { aiStop.hidden = false; after(); });
           } else after();
         });
-      });
+      }
+    }
+
+    // A job the person left and came back to: the draft is the one from when it started, so the same passages
+    // are worked out again from it and the results are applied as before.
+    function resumeJob(m) {
+      setBusy(true);
+      aiStop.hidden = false;
+      aiRunText.textContent = "Picking up where you left off…";
+      aiFill.style.transform = "scaleX(0.05)";
+      if (m.type === "summary") { watchSummary(m.id, function () { aiStop.hidden = false; setBusy(false); }); return; }
+      var units = fmt.splitForAi(d.body);
+      var todo = m.todo.filter(function (i) { return i < units.length && units[i].ai; });
+      if (todo.length !== m.todo.length) { dropMemo(); setBusy(false); aiNote.textContent = "That draft has changed since the AI started, so its work cannot be put back."; return; }
+      watchRewrite(m.id, units, todo, todo.map(function (ui) { return fmt.protect(units[ui].text); }), { skipped: m.skipped }, m.alsoSummary);
     }
 
     var rewriteNow = useJobs ? startRewriteJob : startRewrite;
@@ -1189,6 +1309,7 @@
 
     drawPreview();
     drawSide();
+    if (comp.resume) { var memo = comp.resume; comp.resume = null; resumeJob(memo); return; }
     if (comp.autoAi) {
       comp.autoAi = false;
       if (meAi) rewriteNow(true);
@@ -1239,7 +1360,8 @@
   function route() {
     var r = parseRoute(location.hash);
     if (comp && comp.dirty && r.view !== "new" && r.view !== "edit") {
-      if (!root.confirm("Leave without publishing? Your draft will be lost.")) { location.hash = comp.mode === "edit" ? "#/edit/" + comp.editId : "#/new"; return; }
+      var text = loadMemo() ? "Leave without publishing? The AI keeps working, and you can pick the draft up again from the Knowledgebase page for the next few hours. Anything else in it will be lost." : "Leave without publishing? Your draft will be lost.";
+      if (!root.confirm(text)) { location.hash = comp.mode === "edit" ? "#/edit/" + comp.editId : "#/new"; return; }
     }
     if (r.view !== "new" && r.view !== "edit") comp = null;
     if (r.view === "article") { openArticle(r.id); return; }
