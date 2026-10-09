@@ -1025,18 +1025,15 @@
     // The optional help from the site's own model. Nothing here runs unless a button is
     // pressed, and the text goes only to the site's own model, not to an outside service.
     var meAi = state.me && state.me.ai;
-    var running = false, stopRequested = false;
+    var running = false;
     aiRewrite.disabled = !meAi;
     ai.disabled = !meAi;
-    // With the background service on, the model runs as a job: it takes a few minutes, the page checks on
-    // it, and nothing is lost if it is slow. Otherwise the older direct route is used (it often times out).
-    var useJobs = !!(state.me && state.me.aiJobs);
+    // The model runs as a background job: it takes a few minutes, the page checks on it, and nothing is lost
+    // if it is slow. (The older direct routes, which timed out on this server, were removed on 2026-10-10.)
     aiNote.textContent = !meAi
-      ? "The site’s AI model is not connected, so you can write the summary yourself."
-      : useJobs
-        ? "Runs in the background on this site’s own model, not an outside service. A summary takes a few minutes and a rewrite two or three minutes a passage; you can stop at any time." +
-          (state.me.aiEngineOnline === false ? " The AI service looks offline right now." : "")
-        : "Sent to this site’s own model, not an outside service. Rewriting takes about a minute for every paragraph; you can stop at any time.";
+      ? "The site’s AI service is not switched on, so you can write the summary yourself."
+      : "Runs in the background on this site’s own model, not an outside service. A summary takes a few minutes and a rewrite two or three minutes a passage; you can stop at any time." +
+        (state.me.aiEngineOnline === false ? " The AI service looks offline right now." : "");
 
     function setBusy(on) {
       running = on;
@@ -1048,18 +1045,6 @@
     }
     function refreshAll() { summary.value = d.summary; text.value = d.body; updateCount(); drawPreview(); drawSide(); if (running && comp.pubBtn) comp.pubBtn.disabled = true; }
 
-    function runSummary(done) {
-      aiNote.textContent = "Asking the model for a summary… this can take a minute or two.";
-      kb("POST", "/ai-summary", { title: d.title, body: d.body }).then(function (r) {
-        if (r.status !== 200) { aiNote.textContent = describeError(r.status, r.json); if (done) done(false); return; }
-        d.summary = r.json.summary;
-        d.body = fmt.withKeyPoints(d.body, r.json.takeaways);
-        comp.dirty = true;
-        refreshAll();
-        aiNote.textContent = "Summary and key points added (" + r.json.left + " summaries left today). Check they read right.";
-        if (done) done(true);
-      });
-    }
     // ---- as background jobs ----------------------------------------------------------------
     // Watches one job until it ends: asks for it every few seconds, hands each answer to onUpdate, and
     // resolves with {ok, data, stopped} (data = the last answer: job, result or results, left). Stop
@@ -1142,83 +1127,14 @@
       setBusy(true);
       aiRunText.textContent = "Asking the model for a summary…";
       aiFill.style.transform = "scaleX(0.05)";
-      if (useJobs) { aiStop.hidden = true; runSummaryJob(function () { aiStop.hidden = false; setBusy(false); }); return; }
       aiStop.hidden = true;
-      runSummary(function () { aiStop.hidden = false; setBusy(false); });
+      runSummaryJob(function () { aiStop.hidden = false; setBusy(false); });
     });
 
-    // Rewrite the article one passage at a time. Each prose passage (about 90 words) is a
-    // separate request so none runs longer than the model's time limit; headings, code,
-    // tables, pictures and short lines stay exactly as written, and a rewrite that fails
-    // any check is dropped (the author's own words stay).
-    function startRewrite(alsoSummary) {
-      onChange();
-      if (running || !d.body.trim()) return;
-      var units = fmt.splitForAi(d.body);
-      var todo = [];
-      units.forEach(function (u, i) { if (u.ai) todo.push(i); });
-      if (!todo.length) { aiNote.textContent = "Nothing to rewrite here: it is all headings, code, tables, pictures or short lines."; if (alsoSummary) runSummary(); return; }
-      var done = 0, kept = 0, fails = 0, at = 0, started = Date.now(), halted = "";
-      stopRequested = false;
-      aiStop.hidden = false;
-      setBusy(true);
-      function eta() {
-        var left = todo.length - at;
-        var per = at > 0 ? (Date.now() - started) / at : 60000;
-        var mins = Math.max(1, Math.round((left * per) / 60000));
-        return "about " + mins + (mins === 1 ? " minute" : " minutes") + " left";
-      }
-      function paint() {
-        aiRunText.textContent = at >= todo.length ? "Finishing…" : "Rewriting passage " + (at + 1) + " of " + todo.length + " (" + eta() + "). Stop at any time.";
-        aiFill.style.transform = "scaleX(" + (todo.length ? at / todo.length : 1).toFixed(3) + ")";
-      }
-      function finish() {
-        d.body = fmt.joinUnits(units);
-        comp.dirty = true;
-        function after() {
-          setBusy(false);
-          var msg = (halted ? halted + " " : "") + "Rewrote " + done + " of " + todo.length + " passages" + (kept ? "; " + kept + " kept as you wrote them" : "") + ". Read it through before publishing.";
-          aiNote.textContent = msg;
-          refreshAll();
-        }
-        refreshAll();
-        if (alsoSummary && !stopRequested && !halted) {
-          aiRunText.textContent = "Writing the summary and key points…";
-          runSummary(function () { after(); });
-        } else after();
-      }
-      function step() {
-        if (stopRequested) { halted = "Stopped."; finish(); return; }
-        if (at >= todo.length) { finish(); return; }
-        paint();
-        var u = units[todo[at]];
-        var pr = fmt.protect(u.text);
-        kb("POST", "/ai-section", { heading: u.heading || d.title, text: pr.text }).then(function (r) {
-          if (r.status === 200) {
-            var back = fmt.restore(r.json.text, pr.tokens);
-            if (back !== null && fmt.acceptRewrite(u.text, back)) { u.text = back; done++; } else kept++;
-            fails = 0;
-          } else if (r.status === 429 || r.status === 401 || r.status === 403 || r.json.error === "ai_unavailable" || r.json.error === "secret_detected") {
-            halted = r.status === 429 ? "The daily AI limit was reached, so it stopped." : r.json.error === "secret_detected" ? "A passage looks like it holds a password or key, so it stopped." : describeError(r.status, r.json);
-            finish();
-            return;
-          } else {
-            kept++; fails++;
-            if (fails >= 3) { halted = "The model kept failing, so it stopped."; finish(); return; }
-          }
-          at++;
-          d.body = fmt.joinUnits(units);
-          text.value = d.body;
-          drawPreview();
-          step();
-        });
-      }
-      step();
-    }
-    // The same rewrite as one background job: every prose passage goes in a single request (code,
-    // links and images already swapped for markers), the page watches the job and applies each passage
-    // as it comes back, applying the same checks as above, so a bad rewrite is dropped and the author's
-    // words stay. Passages beyond what one job takes are left as written.
+    // Rewrite the article as one background job: every prose passage (about 90 words; headings, code, tables,
+    // pictures and short lines stay exactly as written) goes in a single request with code, links and images
+    // already swapped for markers. The page watches the job and applies each passage as it comes back; a rewrite
+    // that fails any check is dropped and the author's words stay. Passages beyond what one job takes are left as written.
     function startRewriteJob(alsoSummary) {
       onChange();
       if (running || !d.body.trim()) return;
@@ -1299,11 +1215,10 @@
       watchRewrite(m.id, units, todo, todo.map(function (ui) { return fmt.protect(units[ui].text); }), { skipped: m.skipped }, m.alsoSummary);
     }
 
-    var rewriteNow = useJobs ? startRewriteJob : startRewrite;
+    var rewriteNow = startRewriteJob;
     aiRewrite.addEventListener("click", function () { rewriteNow(true); });
     aiStop.addEventListener("click", function () {
-      if (useJobs) { if (watching) { watching.stop = true; aiRunText.textContent = "Stopping…"; watching.wake(); } return; }
-      stopRequested = true; aiRunText.textContent = "Stopping after this passage…";
+      if (watching) { watching.stop = true; aiRunText.textContent = "Stopping…"; watching.wake(); }
     });
     comp.startRewrite = rewriteNow;
 
