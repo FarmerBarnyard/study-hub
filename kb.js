@@ -144,9 +144,71 @@
   var PII_WORDS = { email: "email addresses", phone: "phone numbers", card: "card numbers", tfn: "tax file numbers", medicare: "Medicare numbers", ssn: "social security numbers" };
   function describePii(kinds) { return (kinds || []).map(function (k) { return PII_WORDS[k] || k; }).join(", "); }
 
+  // ---- the AI help as background jobs -------------------------------------------------------
+  //
+  // The site's model is too slow to answer a waiting request, so the page queues a job and checks
+  // on it every few seconds (the Worker: /kb/ai-job). These helpers are the wording and the
+  // arithmetic; the page code below does the asking.
+
+  var JOB_ERRORS = {
+    too_many_jobs: "You already have three AI jobs waiting or running. Let one finish, or stop it, then try again.",
+    queue_full: "The AI queue is full right now. Try again in a few minutes.",
+    too_many_units: "That is more passages than one job can take.",
+    spec_too_large: "That article is too long to send in one go.",
+    rate_limited: "You have used today's AI allowance. It resets tomorrow.",
+  };
+
+  function describeJobError(status, json) {
+    var j = json || {};
+    if (j.error === "ai_unavailable" && j.reason === "engine_offline") return "The AI service is offline right now (the server that runs it is not answering). Try again later, or write it yourself.";
+    if (JOB_ERRORS[j.error]) return JOB_ERRORS[j.error];
+    return describeError(status, json);
+  }
+
+  // The longest passage list one job takes; the rest of the article is left as written.
+  function planRewrite(todo, max) {
+    var cap = Number.isInteger(max) && max > 0 ? max : 30;
+    return { take: todo.slice(0, cap), skipped: Math.max(0, todo.length - cap) };
+  }
+
+  // About how long is left, from how fast the finished results came (a first guess until one has).
+  function jobEtaMs(job, now) {
+    var left = Math.max(0, (job.total || 0) - (job.done || 0) - (job.failed || 0));
+    var finished = (job.done || 0) + (job.failed || 0);
+    var per = finished > 0 && job.startedAt ? (now - job.startedAt) / finished : 150000;
+    return left * per;
+  }
+
+  function minutesText(ms) {
+    var mins = Math.max(1, Math.round(ms / 60000));
+    return "about " + mins + (mins === 1 ? " minute" : " minutes");
+  }
+
+  // One line for the progress area. `what` is "summary" or "rewrite".
+  function jobStatusText(job, what, now) {
+    if (job.state === "queued") return "Waiting for the AI service to start…";
+    if (job.cancelling) return "Stopping…";
+    if (what === "summary") return "Writing the summary… this takes a few minutes. You can leave this page open and keep reading.";
+    var at = Math.min(job.total, (job.done || 0) + (job.failed || 0) + 1);
+    return "Rewriting passage " + at + " of " + job.total + " (" + minutesText(jobEtaMs(job, now)) + " left). Stop at any time.";
+  }
+
+  // 0..1 for the bar: finished results over the total (a sliver while waiting so it is visibly alive).
+  function jobFraction(job) {
+    if (!job.total) return 0.05;
+    return Math.max(0.05, Math.min(1, ((job.done || 0) + (job.failed || 0)) / job.total));
+  }
+
+  // How often to ask: quickly at first, then every few seconds; slower while it is only queued.
+  function pollDelayMs(attempt, state) {
+    if (state === "queued") return 5000;
+    return attempt < 3 ? 2000 : 4000;
+  }
+
   var api = {
     parseRoute: parseRoute, relTime: relTime, tagCounts: tagCounts, filterItems: filterItems, sortItems: sortItems,
     folderPath: folderPath, noteChoices: noteChoices, describeError: describeError, describePii: describePii,
+    describeJobError: describeJobError, planRewrite: planRewrite, jobEtaMs: jobEtaMs, jobStatusText: jobStatusText, jobFraction: jobFraction, pollDelayMs: pollDelayMs,
   };
   if (typeof document === "undefined") {
     if (typeof module !== "undefined" && module.exports) module.exports = api;
@@ -880,9 +942,15 @@
     var running = false, stopRequested = false;
     aiRewrite.disabled = !meAi;
     ai.disabled = !meAi;
-    aiNote.textContent = meAi
-      ? "Sent to this site’s own model, not an outside service. Rewriting takes about a minute for every paragraph; you can stop at any time."
-      : "The site’s AI model is not connected, so you can write the summary yourself.";
+    // With the background service on, the model runs as a job: it takes a few minutes, the page checks on
+    // it, and nothing is lost if it is slow. Otherwise the older direct route is used (it often times out).
+    var useJobs = !!(state.me && state.me.aiJobs);
+    aiNote.textContent = !meAi
+      ? "The site’s AI model is not connected, so you can write the summary yourself."
+      : useJobs
+        ? "Runs in the background on this site’s own model, not an outside service. A summary takes a few minutes and a rewrite two or three minutes a passage; you can stop at any time." +
+          (state.me.aiEngineOnline === false ? " The AI service looks offline right now." : "")
+        : "Sent to this site’s own model, not an outside service. Rewriting takes about a minute for every paragraph; you can stop at any time.";
 
     function setBusy(on) {
       running = on;
@@ -906,12 +974,79 @@
         if (done) done(true);
       });
     }
+    // ---- as background jobs ----------------------------------------------------------------
+    // Watches one job until it ends: asks for it every few seconds, hands each answer to onUpdate, and
+    // resolves with {ok, data, stopped} (data = the last answer: job, result or results, left). Stop
+    // asks the Worker to cancel and resolves at once with what has arrived; leaving the page cancels too,
+    // so the engine is not left working for nobody.
+    var watching = null;
+    function watchJob(id, onUpdate) {
+      return new Promise(function (resolve) {
+        var attempt = 0, since = null, last = null, started = Date.now();
+        var me = { stop: false, timer: null, wake: null };
+        watching = me;
+        // Stop should act at once, not on the next scheduled check.
+        me.wake = function () { clearTimeout(me.timer); tick(); };
+        var finished = false;
+        function end(res) { if (finished) return; finished = true; clearTimeout(me.timer); if (watching === me) watching = null; resolve(res); }
+        function cancel() { if (!finished) kb("POST", "/ai-job/cancel", { id: id }); }
+        function tick() {
+          if (finished) return;
+          if (!aiRun.isConnected) { cancel(); end({ ok: false, message: "", data: last }); return; }
+          if (me.stop) { cancel(); end({ ok: true, stopped: true, data: last }); return; }
+          kb("GET", "/ai-job?id=" + encodeURIComponent(id) + (since === null ? "" : "&since=" + since)).then(function (r) {
+            if (me.stop) { cancel(); end({ ok: true, stopped: true, data: last }); return; }
+            if (r.status !== 200) {
+              if (r.status === 404 || r.status === 401 || r.status === 403 || attempt > 40) { end({ ok: false, message: describeJobError(r.status, r.json), data: last }); return; }
+              attempt++; me.timer = setTimeout(tick, 5000); return;
+            }
+            if (!r.json.unchanged) { last = r.json; since = r.json.job.rev; }
+            if (last) onUpdate(last);
+            var st = last && last.job.state;
+            if (st === "done" || st === "error" || st === "cancelled") { end({ ok: true, data: last }); return; }
+            if (Date.now() - started > 3 * 3600 * 1000) { cancel(); end({ ok: false, message: "This is taking far too long, so the page stopped waiting.", data: last }); return; }
+            attempt++;
+            me.timer = setTimeout(tick, pollDelayMs(attempt, st));
+          });
+        }
+        tick();
+      });
+    }
+    function paintJob(data, what) {
+      aiRunText.textContent = jobStatusText(data.job, what, Date.now());
+      aiFill.style.transform = "scaleX(" + jobFraction(data.job).toFixed(3) + ")";
+    }
+
+    function runSummaryJob(done) {
+      aiNote.textContent = "";
+      aiRunText.textContent = "Sending the article to the AI service…";
+      kb("POST", "/ai-job", { type: "summary", title: d.title, body: d.body }).then(function (r) {
+        if (r.status !== 202) { aiNote.textContent = describeJobError(r.status, r.json); if (done) done(false); return; }
+        aiStop.hidden = false;
+        watchJob(r.json.job.id, function (data) { paintJob(data, "summary"); }).then(function (res) {
+          var data = res.data;
+          if (res.ok && data && data.result) {
+            d.summary = data.result.summary;
+            d.body = fmt.withKeyPoints(d.body, data.result.takeaways);
+            comp.dirty = true;
+            refreshAll();
+            aiNote.textContent = "Summary and key points added (" + (data.left === null || data.left === undefined ? "some" : data.left) + " summaries left today). Check they read right.";
+            if (done) done(true);
+            return;
+          }
+          aiNote.textContent = res.stopped ? "Stopped." : !res.ok ? (res.message || "") : (data && data.job.error) || "The model did not give a usable summary. Try again, or write it yourself.";
+          if (done) done(false);
+        });
+      });
+    }
+
     ai.addEventListener("click", function () {
       onChange();
       if (!d.body.trim()) return;
       setBusy(true);
       aiRunText.textContent = "Asking the model for a summary…";
       aiFill.style.transform = "scaleX(0.05)";
+      if (useJobs) { aiStop.hidden = true; runSummaryJob(function () { aiStop.hidden = false; setBusy(false); }); return; }
       aiStop.hidden = true;
       runSummary(function () { aiStop.hidden = false; setBusy(false); });
     });
@@ -984,15 +1119,79 @@
       }
       step();
     }
-    aiRewrite.addEventListener("click", function () { startRewrite(true); });
-    aiStop.addEventListener("click", function () { stopRequested = true; aiRunText.textContent = "Stopping after this passage…"; });
-    comp.startRewrite = startRewrite;
+    // The same rewrite as one background job: every prose passage goes in a single request (code,
+    // links and images already swapped for markers), the page watches the job and applies each passage
+    // as it comes back, applying the same checks as above, so a bad rewrite is dropped and the author's
+    // words stay. Passages beyond what one job takes are left as written.
+    function startRewriteJob(alsoSummary) {
+      onChange();
+      if (running || !d.body.trim()) return;
+      var units = fmt.splitForAi(d.body);
+      var todo = [];
+      units.forEach(function (u, i) { if (u.ai) todo.push(i); });
+      if (!todo.length) { aiNote.textContent = "Nothing to rewrite here: it is all headings, code, tables, pictures or short lines."; if (alsoSummary) { setBusy(true); runSummaryJob(function () { setBusy(false); }); } return; }
+      var plan = planRewrite(todo, state.me && state.me.limits && state.me.limits.aiRewriteUnits);
+      todo = plan.take;
+      var prot = todo.map(function (ui) { return fmt.protect(units[ui].text); });
+      var done = 0, kept = 0, applied = {};
+      setBusy(true);
+      aiStop.hidden = true;
+      aiRunText.textContent = "Sending " + todo.length + " passage" + (todo.length === 1 ? "" : "s") + " to the AI service…";
+      aiFill.style.transform = "scaleX(0.05)";
+      function apply(results) {
+        var any = false;
+        (results || []).forEach(function (x) {
+          if (applied[x.idx] || x.idx >= todo.length) return;
+          applied[x.idx] = true;
+          any = true;
+          var u = units[todo[x.idx]];
+          if (x.text !== null && x.text !== undefined) {
+            var back = fmt.restore(x.text, prot[x.idx].tokens);
+            if (back !== null && fmt.acceptRewrite(u.text, back)) { u.text = back; done++; return; }
+          }
+          kept++;
+        });
+        if (any) { d.body = fmt.joinUnits(units); text.value = d.body; drawPreview(); comp.dirty = true; }
+      }
+      kb("POST", "/ai-job", { type: "rewrite", units: todo.map(function (ui, k) { return { heading: units[ui].heading || d.title, text: prot[k].text }; }) }).then(function (r) {
+        if (r.status !== 202) { setBusy(false); aiNote.textContent = describeJobError(r.status, r.json); return; }
+        aiStop.hidden = false;
+        watchJob(r.json.job.id, function (data) { apply(data.results); paintJob(data, "rewrite"); }).then(function (res) {
+          if (res.data) apply(res.data.results);
+          var job = res.data && res.data.job;
+          var halted = !res.ok ? (res.message || "") : res.stopped ? "Stopped." : job && job.state === "error" ? (job.error || "The AI service stopped.") : job && job.state === "cancelled" ? "Stopped." : "";
+          var left = res.data && res.data.left !== null && res.data.left !== undefined ? res.data.left : null;
+          function after() {
+            setBusy(false);
+            aiNote.textContent = (halted ? halted + " " : "") + "Rewrote " + done + " of " + todo.length + " passages" + (kept ? "; " + kept + " kept as you wrote them" : "") +
+              (plan.skipped ? "; the last " + plan.skipped + " were left as written (a job takes up to " + (todo.length) + ")" : "") +
+              (left !== null ? "; " + left + " passage rewrites left today" : "") + ". Read it through before publishing.";
+            refreshAll();
+          }
+          refreshAll();
+          if (alsoSummary && !halted) {
+            aiRunText.textContent = "Writing the summary and key points…";
+            aiFill.style.transform = "scaleX(0.05)";
+            aiStop.hidden = true;
+            runSummaryJob(function () { aiStop.hidden = false; after(); });
+          } else after();
+        });
+      });
+    }
+
+    var rewriteNow = useJobs ? startRewriteJob : startRewrite;
+    aiRewrite.addEventListener("click", function () { rewriteNow(true); });
+    aiStop.addEventListener("click", function () {
+      if (useJobs) { if (watching) { watching.stop = true; aiRunText.textContent = "Stopping…"; watching.wake(); } return; }
+      stopRequested = true; aiRunText.textContent = "Stopping after this passage…";
+    });
+    comp.startRewrite = rewriteNow;
 
     drawPreview();
     drawSide();
     if (comp.autoAi) {
       comp.autoAi = false;
-      if (meAi) startRewrite(true);
+      if (meAi) rewriteNow(true);
       else aiNote.textContent = "The site’s AI model is not connected, so this draft was not rewritten. You can edit it by hand and publish.";
     }
   }
