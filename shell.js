@@ -43,7 +43,9 @@
     { id: "overview", title: "Overview", group: "", icon: "home", path: "", local: "./" },
     { id: "ops", title: "Ops board", group: "Work", icon: "board", path: "ops.html", local: "ops.html" },
     // ownerOnly: shown only to the hub owner (Theme.who says owner === true), and hidden until that is known.
-    { id: "chat", title: "Claude", group: "Work", icon: "chat", path: "chat.html", local: "chat.html", ownerOnly: true },
+    // chatOnly: the Claude chat: the owner, and anyone the Worker says may use it (Theme.who says chat === true,
+    // which is true for a guest only while the owner has switched guest chats on). Hidden until that is known.
+    { id: "chat", title: "Claude", group: "Work", icon: "chat", path: "chat.html", local: "chat.html", chatOnly: true },
     // `app` is the group-backed app a link needs; a signed-in person whose groups
     // do not include it does not see the link (see Theme.who in themes.js).
     { id: "study", title: "Study", group: "Sites", icon: "book", url: "https://study.barnyard.site/", app: "study" },
@@ -118,6 +120,7 @@
   function pageAllowed(p) {
     // An owner-only page is shown only once the person is known to be the owner (it fails closed, unlike the app links).
     if (p.ownerOnly) { var s = Theme.who && Theme.who.get(); return !!s && s.owner === true; }
+    if (p.chatOnly) { var c = Theme.who && Theme.who.get(); return !!c && (c.owner === true || c.chat === true); }
     return !Theme.who || Theme.who.allows(Theme.who.get(), p.app);
   }
   function applyWho() {
@@ -170,8 +173,8 @@
       if (p.id === "ops") { els.badge = h("span", "badge", "0"); els.badge.hidden = true; a.appendChild(els.badge); }
       var abs = new URL(a.href, location.href);
       if (abs.origin !== location.origin) a.appendChild(svg("ext", "ext"));
-      if (p.app || p.ownerOnly) navLinks[p.id] = a;
-      if (p.ownerOnly) a.hidden = !pageAllowed(p);
+      if (p.app || p.ownerOnly || p.chatOnly) navLinks[p.id] = a;
+      if (p.ownerOnly || p.chatOnly) a.hidden = !pageAllowed(p);
       nav.appendChild(a);
     });
     side.appendChild(nav);
