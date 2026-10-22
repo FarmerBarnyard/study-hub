@@ -2,7 +2,7 @@
 // light/dark switch, Settings), page-background layer and the Settings panel.
 //
 // A page supplies only its own content, inside <main id="page" class="content">,
-// and says which page it is with <body data-shell="overview|ops|chat|study|kb|campaign|stocks">.
+// and says which page it is with <body data-shell="overview|ops|vuln|chat|study|kb|campaign|stocks">.
 // This script wraps that content in the shell.
 //
 // A generated page whose body this repo does not author (the Stocks dashboard,
@@ -42,6 +42,7 @@
   var PAGES = [
     { id: "overview", title: "Overview", group: "", icon: "home", path: "", local: "./" },
     { id: "ops", title: "Ops board", group: "Work", icon: "board", path: "ops.html", local: "ops.html" },
+    { id: "vuln", title: "Vulnerabilities", group: "Work", icon: "shield", path: "vulnerabilities.html", local: "vulnerabilities.html" },
     // ownerOnly: shown only to the hub owner (Theme.who says owner === true), and hidden until that is known.
     // chatOnly: the Claude chat: the owner, and anyone the Worker says may use it (Theme.who says chat === true,
     // which is true for a guest only while the owner has switched guest chats on). Hidden until that is known.
@@ -58,6 +59,7 @@
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
     board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
     chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-7l-5 4v-4H6a2 2 0 01-2-2z"/><path d="M8 9h8M8 12h5"/>',
+    shield: '<path d="M12 3l7 3v5.5c0 4.4-3 8.2-7 9.5-4-1.3-7-5.1-7-9.5V6z"/><path d="M12 8v4.5M12 15.5v.01"/>',
     book: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',
     map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
@@ -104,6 +106,7 @@
     if (/^stocks\./.test(host)) return "stocks";
     if (/(^|\/)ops\.html$/.test(location.pathname)) return "ops";
     if (/(^|\/)chat\.html$/.test(location.pathname)) return "chat";
+    if (/(^|\/)vulnerabilities\.html$/.test(location.pathname)) return "vuln";
     return "overview";
   }
 
