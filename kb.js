@@ -5,8 +5,10 @@
 // (api.barnyard.site/notebook/*). An article is a COPY: publishing sends the text
 // (and the images it uses) to the library, editing a note afterwards changes nothing.
 //
-// Views, by address hash:  #/ library · #/a/<id> an article · #/new[?note=<id>] and
-// #/edit/<id> the page where an article is generated from notes and published.
+// Views, by address hash:  #/ the sections (categories) · #/c/<category> one section's articles ·
+// #/all every article · #/a/<id> an article · #/new[?note=<id>] and #/edit/<id> the page where an article
+// is generated from notes and published. The sections come from the Worker (GET /kb/me -> categories);
+// against an older Worker that sends none, #/ is the flat list of articles it always was.
 //
 // Article text is shown with markdown.js (DOM nodes only, never innerHTML), so a
 // published article cannot inject script or style however it is written.
@@ -22,6 +24,9 @@
   var ACCENTS = 8;
   var ARTICLE_ID = /^ka_[a-z0-9]{8}$/;
   var NOTE_ID = /^nt_[a-z0-9]{8}$/;
+  var CATEGORY_ID = /^[a-z0-9]{2,24}$/;
+  var RECENT = 4;          // articles in the landing page's "Recently updated" row
+  var LATEST = 3;          // titles listed on a section's card
 
   // ------------------------------------------------------------ pure helpers
 
@@ -33,6 +38,8 @@
     var parts = h.split("/").filter(Boolean);
     if (parts[0] === "a" && ARTICLE_ID.test(parts[1] || "")) return { view: "article", id: parts[1] };
     if (parts[0] === "edit" && ARTICLE_ID.test(parts[1] || "")) return { view: "edit", id: parts[1] };
+    if (parts[0] === "c" && CATEGORY_ID.test(parts[1] || "")) return { view: "category", id: parts[1] };
+    if (parts[0] === "all") return { view: "all" };
     if (parts[0] === "new") {
       var notes = [];
       q.split("&").forEach(function (kv) {
@@ -65,6 +72,27 @@
       .sort(function (a, b) { return b.count - a.count || (a.tag < b.tag ? -1 : 1); });
   }
 
+  // The section an article is in. The Worker always sends one; "other" covers an older answer without it.
+  function categoryOf(it) { return it && typeof it.category === "string" && it.category ? it.category : "other"; }
+
+  // One entry for every section the Worker listed, in its order, empty ones too:
+  // [{id, name, blurb, accent, count, latest:[{id,title}], updatedAt}]. The newest articles come first in `latest`.
+  function categoryCounts(items, cats) {
+    var by = {};
+    (cats || []).forEach(function (c) { by[c.id] = { id: c.id, name: c.name, blurb: c.blurb || "", accent: Number.isInteger(c.accent) ? c.accent : 0, count: 0, latest: [], updatedAt: 0 }; });
+    sortItems(items || [], "updated").forEach(function (it) {
+      var c = by[categoryOf(it)] || by.other;
+      if (!c) return;
+      c.count++;
+      if (c.latest.length < LATEST) c.latest.push({ id: it.id, title: it.title });
+      if ((it.updatedAt || 0) > c.updatedAt) c.updatedAt = it.updatedAt;
+    });
+    return (cats || []).map(function (c) { return by[c.id]; });
+  }
+
+  // "12 articles", "1 article", "No articles yet".
+  function countText(n) { return n === 0 ? "No articles yet" : n + (n === 1 ? " article" : " articles"); }
+
   // Filters the list the page already has; every word of the query must appear in the
   // title, summary, tags or author.
   function filterItems(items, f) {
@@ -72,6 +100,7 @@
     return items.filter(function (it) {
       if (f && f.mine && !it.mine) return false;
       if (f && f.tag && (it.tags || []).indexOf(f.tag) === -1) return false;
+      if (f && f.category && categoryOf(it) !== f.category) return false;
       if (!words.length) return true;
       var hay = (it.title + " " + (it.summary || "") + " " + (it.tags || []).join(" ") + " " + (it.author || "")).toLowerCase();
       return words.every(function (w) { return hay.indexOf(w) !== -1; });
@@ -232,6 +261,7 @@
     if (!d || typeof d !== "object" || !isText(d.title, 400) || !isText(d.summary, 2000) || !isText(d.body, 300000)) return null;
     if (!Array.isArray(d.tags) || d.tags.length > 30 || !d.tags.every(function (t) { return isText(t, 60); })) return null;
     if (d.accent !== null && !Number.isInteger(d.accent)) return null;
+    if (d.category !== undefined && d.category !== "" && !(typeof d.category === "string" && CATEGORY_ID.test(d.category))) return null;
     var todo = Array.isArray(m.todo) ? m.todo : [];
     if (m.type === "rewrite" && (!todo.length || todo.length > 200 || !todo.every(function (i) { return Number.isInteger(i) && i >= 0 && i < 100000; }))) return null;
     var sources = Array.isArray(m.sources) ? m.sources : [];
@@ -239,7 +269,7 @@
     return {
       v: 1, id: m.id, type: m.type, startedAt: m.startedAt, mode: m.mode, editId: m.mode === "edit" ? m.editId : null,
       rev: Number.isFinite(m.rev) ? m.rev : null, alsoSummary: m.alsoSummary === true, todo: todo, skipped: Number.isInteger(m.skipped) && m.skipped > 0 ? m.skipped : 0,
-      draft: { title: d.title, summary: d.summary, tags: d.tags.slice(), body: d.body, accent: d.accent }, sources: sources.slice(),
+      draft: { title: d.title, summary: d.summary, tags: d.tags.slice(), body: d.body, accent: d.accent, category: d.category || "" }, sources: sources.slice(),
     };
   }
 
@@ -255,6 +285,7 @@
   var api = {
     readMemo: readMemo, memoLine: memoLine, MEMO_MAX_AGE_MS: MEMO_MAX_AGE_MS,
     parseRoute: parseRoute, relTime: relTime, tagCounts: tagCounts, filterItems: filterItems, sortItems: sortItems,
+    categoryOf: categoryOf, categoryCounts: categoryCounts, countText: countText,
     folderPath: folderPath, noteChoices: noteChoices, describeError: describeError, describePii: describePii,
     describeJobError: describeJobError, planRewrite: planRewrite, jobEtaMs: jobEtaMs, jobStatusText: jobStatusText, jobFraction: jobFraction, pollDelayMs: pollDelayMs,
   };
@@ -273,6 +304,8 @@
     items: [],           // the library list
     loaded: false,
     q: "", tag: "", sort: "updated", mine: false,
+    cats: null,          // the Worker's sections [{id, name, blurb, accent}], or null from an older Worker
+    catId: "",           // the open section's id, "" for every article
     searchSeq: 0, serverResults: null,
     cur: null,           // the open article's response
   };
@@ -415,12 +448,19 @@
     return m;
   }
 
-  function card(it) {
+  // The name of a section, from the Worker's list.
+  function categoryName(id) {
+    var c = (state.cats || []).filter(function (x) { return x.id === id; })[0];
+    return c ? c.name : "";
+  }
+
+  // `showCat`: label the cover with the article's section (lists that mix sections) instead of its first tag.
+  function card(it, showCat) {
     var a = el("a", "kb-card " + accentOf(it));
     a.href = "#/a/" + it.id;
     var cover = el("div", "kb-cover", a);
     cover.setAttribute("data-p", String((it.accent || 0) % 4));
-    el("span", "kb-cover-tag", cover, (it.tags && it.tags[0]) || "Article");
+    el("span", "kb-cover-tag", cover, (showCat && categoryName(categoryOf(it))) || (it.tags && it.tags[0]) || "Article");
     if (it.hidden) el("span", "kb-hidden-badge", cover, "Hidden");
     var body = el("div", "kb-card-body", a);
     el("h3", "kb-card-title", body, it.title);
@@ -436,7 +476,7 @@
 
   function visibleItems() {
     var base = state.serverResults && state.q.length >= 2 ? state.serverResults : state.items;
-    var list = filterItems(base, { tag: state.tag, mine: state.mine, q: state.serverResults && state.q.length >= 2 ? "" : state.q });
+    var list = filterItems(base, { tag: state.tag, mine: state.mine, category: state.catId, q: state.serverResults && state.q.length >= 2 ? "" : state.q });
     if (state.serverResults && state.q.length >= 2) return list;     // the server already ranked these
     return sortItems(list, state.sort);
   }
@@ -446,7 +486,15 @@
     if (!host) return;
     clear(host);
     var list = visibleItems();
-    $("kb-count").textContent = state.items.length ? list.length + (list.length === state.items.length ? " articles" : " of " + state.items.length + " articles") : "";
+    var pool = state.catId ? state.items.filter(function (i) { return categoryOf(i) === state.catId; }) : state.items;
+    $("kb-count").textContent = pool.length ? list.length + (list.length === pool.length ? " articles" : " of " + pool.length + " articles") : "";
+    if (state.catId && state.items.length && !pool.length) {
+      var soon = el("div", "kb-empty", host);
+      el("h2", "", soon, "Nothing in " + (categoryName(state.catId) || "this section") + " yet");
+      el("p", "", soon, "Publish an article and choose this section, or it will be filed here when its tags and title match.");
+      btn("Write an article", "btn kb-primary", soon, function () { location.hash = "#/new"; });
+      return;
+    }
     if (!state.items.length) {
       var empty = el("div", "kb-empty", host);
       el("h2", "", empty, "Nothing published yet");
@@ -461,14 +509,14 @@
       btn("Clear filters", "btn", none, function () { state.q = ""; state.tag = ""; state.mine = false; state.serverResults = null; renderLibrary(); });
       return;
     }
-    list.forEach(function (it) { host.appendChild(card(it)); });
+    list.forEach(function (it) { host.appendChild(card(it, !state.catId)); });
   }
 
   function renderTagRow() {
     var host = $("kb-tagrow");
     if (!host) return;
     clear(host);
-    var counts = tagCounts(state.items).slice(0, 14);
+    var counts = tagCounts(state.catId ? state.items.filter(function (i) { return categoryOf(i) === state.catId; }) : state.items).slice(0, 14);
     if (!counts.length) return;
     var all = btn("All", "kb-chip", host, function () { state.tag = ""; renderTagRow(); renderResults(); });
     all.setAttribute("aria-pressed", String(!state.tag));
@@ -482,11 +530,11 @@
   function searchNow() {
     var q = state.q.trim();
     var seq = ++state.searchSeq;
-    if (q.length < 2) { state.serverResults = null; renderResults(); return; }
+    if (q.length < 2) { state.serverResults = null; if ($("kb-landing")) renderLandingBody(); else renderResults(); return; }
     kb("GET", "/list?q=" + encodeURIComponent(q)).then(function (r) {
       if (seq !== state.searchSeq) return;
       state.serverResults = r.status === 200 ? r.json.items : null;
-      renderResults();
+      if ($("kb-landing")) renderLandingBody(); else renderResults();
     });
   }
 
@@ -497,8 +545,15 @@
     clear(view);
     var head = el("div", "page-head kb-head", view);
     var titleBox = el("div", "", head);
-    el("h1", "", titleBox, "Knowledgebase");
-    el("p", "", titleBox, "Articles written from study notes. Everyone who can sign in here can read them.");
+    var sect = state.catId ? (state.cats || []).filter(function (c) { return c.id === state.catId; })[0] : null;
+    if (state.cats) {
+      var crumbs = el("nav", "kb-crumbs", titleBox);
+      crumbs.setAttribute("aria-label", "Breadcrumb");
+      var home = el("a", "", crumbs, "Knowledgebase"); home.href = "#/";
+      el("span", "", crumbs, sect ? sect.name : "All articles");
+    }
+    el("h1", "", titleBox, sect ? sect.name : state.cats ? "All articles" : "Knowledgebase");
+    el("p", "", titleBox, sect ? sect.blurb : "Articles written from study notes. Everyone who can sign in here can read them.");
     resumeBanner(view);
     var actions = el("div", "kb-head-actions", head);
     btn("Write an article", "btn kb-primary", actions, function () { location.hash = "#/new"; });
@@ -507,7 +562,7 @@
 
     var bar = el("div", "kb-toolbar", view);
     var search = el("input", "kb-search", bar);
-    search.type = "search"; search.placeholder = "Search articles"; search.maxLength = 100; search.value = state.q;
+    search.type = "search"; search.placeholder = sect ? "Search " + sect.name : "Search articles"; search.maxLength = 100; search.value = state.q;
     search.setAttribute("aria-label", "Search articles");
     search.autocomplete = "off";
     search.addEventListener("input", function () {
@@ -531,6 +586,99 @@
     el("div", "kb-grid", view).id = "kb-results";
     renderTagRow();
     renderResults();
+  }
+
+  // The first page: one card for each section, a search box that looks across all of them, and the newest articles.
+  function renderLanding() {
+    dropObservers(); dropScroll();
+    setTitle("");
+    state.catId = "";
+    var view = $("kb-view");
+    clear(view);
+    var head = el("div", "page-head kb-head", view);
+    var titleBox = el("div", "", head);
+    el("h1", "", titleBox, "Knowledgebase");
+    el("p", "", titleBox, "Articles written from study notes, sorted into sections. Everyone who can sign in here can read them.");
+    resumeBanner(view);
+    var actions = el("div", "kb-head-actions", head);
+    btn("Write an article", "btn kb-primary", actions, function () { location.hash = "#/new"; });
+    var all = el("a", "btn", actions, "All articles"); all.href = "#/all";
+    var back = el("a", "btn", actions, "Open Notes"); back.href = "notes.html";
+
+    var bar = el("div", "kb-toolbar", view);
+    var search = el("input", "kb-search", bar);
+    search.type = "search"; search.placeholder = "Search every article"; search.maxLength = 100; search.value = state.q;
+    search.setAttribute("aria-label", "Search every article");
+    search.autocomplete = "off";
+    search.addEventListener("input", function () {
+      state.q = search.value;
+      renderLandingBody();
+      clearTimeout(timers.search);
+      timers.search = setTimeout(searchNow, SEARCH_MS);
+    });
+    el("span", "kb-count", bar).id = "kb-count";
+    el("div", "kb-landing", view).id = "kb-landing";
+    renderLandingBody();
+  }
+
+  function renderLandingBody() {
+    var host = $("kb-landing");
+    if (!host) return;
+    clear(host);
+    var searching = state.q.trim().length >= 2;
+    $("kb-count").textContent = state.items.length ? state.items.length + (state.items.length === 1 ? " article" : " articles") + " in " + (state.cats || []).filter(function (c) { return state.items.some(function (i) { return categoryOf(i) === c.id; }); }).length + " sections" : "";
+    if (searching) {
+      var list = visibleItems();
+      var grid = el("div", "kb-grid", host);
+      if (!list.length) {
+        var none = el("div", "kb-empty", grid);
+        el("h2", "", none, "No articles match");
+        el("p", "", none, "Try fewer words.");
+        return;
+      }
+      list.forEach(function (it) { grid.appendChild(card(it, true)); });
+      return;
+    }
+    if (!state.items.length && state.loaded) {
+      var empty = el("div", "kb-empty", host);
+      el("h2", "", empty, "Nothing published yet");
+      el("p", "", empty, "Pick one or more of your notes and turn them into a tidy, shareable article.");
+      btn("Write the first article", "btn kb-primary", empty, function () { location.hash = "#/new"; });
+      return;
+    }
+    var sec = el("section", "kb-sections", host);
+    el("h2", "kb-h2", sec, "Sections");
+    var counted = categoryCounts(state.items, state.cats);
+    var used = counted.filter(function (c) { return c.count > 0; });
+    var unused = counted.filter(function (c) { return c.count === 0; });
+    var cats = el("div", "kb-grid kb-cats", sec);
+    function sectionCard(c, into) {
+      var a = el("a", "kb-card kb-cat kb-a" + (c.accent % ACCENTS) + (c.count ? "" : " kb-cat-empty"), into);
+      a.href = "#/c/" + c.id;
+      var cover = el("div", "kb-cover", a);
+      cover.setAttribute("data-p", String(c.accent % 4));
+      el("span", "kb-cover-tag", cover, countText(c.count));
+      var body = el("div", "kb-card-body", a);
+      el("h3", "kb-card-title", body, c.name);
+      el("p", "kb-card-sum", body, c.blurb);
+      if (c.latest.length) {
+        var ul = el("ul", "kb-cat-latest", body);
+        c.latest.forEach(function (l) { el("li", "", ul, l.title); });
+      }
+    }
+    used.forEach(function (c) { sectionCard(c, cats); });
+    if (unused.length) {
+      el("h2", "kb-h2 kb-h2-quiet", sec, "Waiting for their first article");
+      var quiet = el("div", "kb-grid kb-cats", sec);
+      unused.forEach(function (c) { sectionCard(c, quiet); });
+    }
+    var recent = sortItems(state.items, "updated").slice(0, RECENT);
+    if (recent.length) {
+      var rec = el("section", "kb-more", host);
+      el("h2", "kb-h2", rec, "Recently updated");
+      var rg = el("div", "kb-grid", rec);
+      recent.forEach(function (it) { rg.appendChild(card(it, true)); });
+    }
   }
 
   function loadLibrary() {
@@ -606,8 +754,8 @@
 
     var banner = el("header", "kb-banner", art);
     banner.setAttribute("data-p", String((a.accent || 0) % 4));
-    var crumb = el("a", "kb-back", banner, "← Knowledgebase");
-    crumb.href = "#/";
+    var crumb = el("a", "kb-back", banner, state.cats && categoryName(categoryOf(a)) ? "← " + categoryName(categoryOf(a)) : "← Knowledgebase");
+    crumb.href = state.cats && categoryName(categoryOf(a)) ? "#/c/" + categoryOf(a) : "#/";
     if (a.tags.length) chips(banner, a.tags);
     el("h1", "kb-title", banner, a.title);
     if (a.summary) el("p", "kb-lede", banner, a.summary);
@@ -838,7 +986,7 @@
     chain.then(function () {
       var published = state.items.map(function (i) { return i.title; });
       var d = fmt.draftFromNotes(notes, { title: comp.title.trim(), publishedTitles: published });
-      comp.draft = { title: d.title, summary: d.summary, tags: d.tags, body: d.body, accent: null };
+      comp.draft = { title: d.title, summary: d.summary, tags: d.tags, body: d.body, accent: null, category: "" };
       comp.report = d.report;
       comp.sources = notes.map(function (n) { return n.title; });
       comp.step = "edit";
@@ -867,7 +1015,7 @@
       }
       var a = r.json.article;
       comp.rev = a.rev;
-      comp.draft = { title: a.title, summary: a.summary, tags: a.tags.slice(), body: a.body, accent: a.accent };
+      comp.draft = { title: a.title, summary: a.summary, tags: a.tags.slice(), body: a.body, accent: a.accent, category: a.category || "" };
       comp.report = fmt.countOf(a.body);
       comp.report.sections = fmt.headingsOf(a.body).filter(function (h) { return h.level === 2; }).length;
       comp.report.flattenedLinks = [];
@@ -927,6 +1075,15 @@
     var tags = el("input", "kb-input");
     tags.type = "text"; tags.value = d.tags.join(", "); tags.autocomplete = "off"; tags.placeholder = "azure, identity";
     field("Tags", tags, "Separate with commas (up to 8). The first one is shown on the card.");
+    if (state.cats) {
+      var cat = el("select", "kb-input");
+      cat.setAttribute("aria-label", "Section");
+      var auto = el("option", "", cat, comp.mode === "edit" ? "Keep as it is" : "Choose for me, from the tags and title"); auto.value = "";
+      state.cats.forEach(function (c) { var op = el("option", "", cat, c.name); op.value = c.id; });
+      cat.value = d.category || "";
+      cat.addEventListener("change", function () { d.category = cat.value; comp.dirty = true; });
+      field("Section", cat, "Where the article is filed in the Knowledgebase. You can change it later.");
+    }
 
     var swWrap = el("div", "kb-label", form);
     el("span", "", swWrap, "Colour");
@@ -1092,7 +1249,7 @@
     function runSummaryJob(done) {
       aiNote.textContent = "";
       aiRunText.textContent = "Sending the article to the AI service…";
-      var startDraft = { title: d.title, summary: d.summary, tags: d.tags.slice(), body: d.body, accent: d.accent === undefined ? null : d.accent };
+      var startDraft = { title: d.title, summary: d.summary, tags: d.tags.slice(), body: d.body, accent: d.accent === undefined ? null : d.accent, category: d.category || "" };
       kb("POST", "/ai-job", { type: "summary", title: d.title, body: d.body }).then(function (r) {
         if (r.status !== 202) { aiNote.textContent = describeJobError(r.status, r.json); if (done) done(false); return; }
         saveMemo({ v: 1, id: r.json.job.id, type: "summary", startedAt: Date.now(), mode: comp.mode, editId: comp.editId || null, rev: comp.rev === undefined ? null : comp.rev, alsoSummary: false, todo: [], skipped: 0, draft: startDraft, sources: comp.sources || [] });
@@ -1145,7 +1302,7 @@
       var plan = planRewrite(todo, state.me && state.me.limits && state.me.limits.aiRewriteUnits);
       todo = plan.take;
       var prot = todo.map(function (ui) { return fmt.protect(units[ui].text); });
-      var startDraft = { title: d.title, summary: d.summary, tags: d.tags.slice(), body: d.body, accent: d.accent === undefined ? null : d.accent };
+      var startDraft = { title: d.title, summary: d.summary, tags: d.tags.slice(), body: d.body, accent: d.accent === undefined ? null : d.accent, category: d.category || "" };
       setBusy(true);
       aiStop.hidden = true;
       aiRunText.textContent = "Sending " + todo.length + " passage" + (todo.length === 1 ? "" : "s") + " to the AI service…";
@@ -1236,6 +1393,7 @@
     var d = comp.draft;
     var edit = comp.mode === "edit";
     var body = { title: d.title.trim(), summary: d.summary.trim(), body: d.body, tags: d.tags };
+    if (d.category) body.category = d.category;
     if (d.accent !== null && d.accent !== undefined) body.accent = d.accent;
     if (allowPii) body.allowPii = true;
     if (edit) body.baseRev = comp.rev;
@@ -1282,9 +1440,13 @@
     if (r.view === "article") { openArticle(r.id); return; }
     if (r.view === "new") { if (comp && comp.mode === "new" && comp.step === "edit") return; startNew(r.notes, r.ai); return; }
     if (r.view === "edit") { if (comp && comp.mode === "edit" && comp.editId === r.id) return; startEdit(r.id); return; }
-    renderLibrary();
+    var shown = r.view === "library" && state.cats ? "landing" : r.view === "category" && state.cats && state.cats.some(function (c) { return c.id === r.id; }) ? "category" : r.view === "all" && state.cats ? "all" : "flat";
+    state.catId = shown === "category" ? r.id : "";
+    if (shown === "landing") renderLanding(); else renderLibrary();
     loadLibrary().then(function (ok) {
-      if (ok && parseRoute(location.hash).view === "library") { renderTagRow(); renderResults(); }
+      var now = parseRoute(location.hash);
+      if (!ok || ["library", "category", "all"].indexOf(now.view) === -1) return;
+      if (shown === "landing") renderLandingBody(); else { renderTagRow(); renderResults(); }
     });
   }
 
@@ -1298,6 +1460,7 @@
       if (r.status === 403) { showGate("Your account does not have access to the study site.", false); return; }
       if (r.status !== 200) { showGate(r.status === 0 ? "Could not reach the server. Check your connection and reload." : "The Knowledgebase is unavailable right now (" + (r.json.error || r.status) + ").", false); return; }
       state.me = r.json;
+      state.cats = Array.isArray(r.json.categories) && r.json.categories.length ? r.json.categories : null;
       $("kb-gate").hidden = true;
       $("kb").hidden = false;
       if (root.BarnyardShell && root.BarnyardShell.setSearchSource) {

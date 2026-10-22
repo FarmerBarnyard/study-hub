@@ -168,7 +168,7 @@ test("a remembered job reads back exactly, and only what the page stores is kept
   assert.strictEqual(m.skipped, 1);
   var extra = read(Object.assign(memo(), { secret: "x", draft: Object.assign(memo().draft, { extra: 1 }) }));
   assert.deepStrictEqual(Object.keys(extra).sort(), ["alsoSummary", "draft", "editId", "id", "mode", "rev", "skipped", "sources", "startedAt", "todo", "type", "v"]);
-  assert.deepStrictEqual(Object.keys(extra.draft).sort(), ["accent", "body", "summary", "tags", "title"]);
+  assert.deepStrictEqual(Object.keys(extra.draft).sort(), ["accent", "body", "category", "summary", "tags", "title"]);
   var edit = read(memo({ mode: "edit", editId: "ka_abcd1234", rev: 4 }));
   assert.strictEqual(edit.editId, "ka_abcd1234");
   assert.strictEqual(edit.rev, 4);
@@ -206,6 +206,91 @@ test("leaving the page no longer cancels the job; finishing or discarding drops 
   assert.strictEqual((js.match(/if \(res\.left\) return;\s*dropMemo\(\);/g) || []).length, 2, "both watchers keep the memory on leaving and drop it on any other end");
   assert.ok(js.indexOf('kb("POST", "/ai-job/cancel", { id: memo.id })') >= 0, "Discard cancels the job");
   assert.ok(/sessionStorage/.test(js) && !/localStorage/.test(js.slice(js.indexOf("function saveMemo"), js.indexOf("function saveMemo") + 400)), "kept in this tab only");
+});
+
+// ---- sections (categories) ----------------------------------------------------------
+
+var CATS = [
+  { id: "certifications", name: "Certifications & exams", blurb: "Study notes.", accent: 0 },
+  { id: "backup", name: "Backup & recovery", blurb: "Veeam.", accent: 1 },
+  { id: "troubleshooting", name: "Troubleshooting", blurb: "Fixes.", accent: 6 },
+  { id: "other", name: "Other", blurb: "The rest.", accent: 3 },
+];
+var ITEMS = [
+  { id: "ka_aaaaaaa1", title: "SC-300", category: "certifications", updatedAt: 10, tags: ["sc-300"] },
+  { id: "ka_aaaaaaa2", title: "MS-900 cloud", category: "certifications", updatedAt: 30, tags: [] },
+  { id: "ka_aaaaaaa3", title: "Veeam: DRaaS", category: "backup", updatedAt: 20, tags: ["veeam"] },
+  { id: "ka_aaaaaaa4", title: "Old answer", updatedAt: 5, tags: [] },
+  { id: "ka_aaaaaaa5", title: "Mystery", category: "no-such-section", updatedAt: 6, tags: [] },
+];
+
+test("a section's address opens that section, and all articles has its own address", function () {
+  assert.deepStrictEqual(k.parseRoute("#/c/backup"), { view: "category", id: "backup" });
+  assert.deepStrictEqual(k.parseRoute("#/c/microsoft365"), { view: "category", id: "microsoft365" });
+  assert.deepStrictEqual(k.parseRoute("#/all"), { view: "all" });
+  ["#/c/", "#/c/Backup", "#/c/../x", "#/c/a", "#/c/" + "x".repeat(25), "#/c/back up"].forEach(function (h) {
+    assert.deepStrictEqual(k.parseRoute(h), { view: "library" }, h);
+  });
+});
+
+test("an article's section: the one sent, else Other", function () {
+  assert.strictEqual(k.categoryOf({ category: "backup" }), "backup");
+  assert.strictEqual(k.categoryOf({}), "other");
+  assert.strictEqual(k.categoryOf({ category: "" }), "other");
+  assert.strictEqual(k.categoryOf({ category: 4 }), "other");
+  assert.strictEqual(k.categoryOf(null), "other");
+});
+
+test("every section is counted, empty ones too, with the newest titles first and an unknown section counted as Other", function () {
+  var got = k.categoryCounts(ITEMS, CATS);
+  assert.deepStrictEqual(got.map(function (c) { return c.id; }), ["certifications", "backup", "troubleshooting", "other"]);
+  assert.deepStrictEqual(got.map(function (c) { return c.count; }), [2, 1, 0, 2]);
+  assert.deepStrictEqual(got[0].latest.map(function (l) { return l.title; }), ["MS-900 cloud", "SC-300"]);
+  assert.strictEqual(got[0].updatedAt, 30);
+  assert.deepStrictEqual(got[2].latest, []);
+  assert.strictEqual(got[2].name, "Troubleshooting");
+  assert.strictEqual(got[1].accent, 1);
+  var many = [1, 2, 3, 4, 5].map(function (n) { return { id: "ka_bbbbbbb" + n, title: "T" + n, category: "backup", updatedAt: n }; });
+  assert.deepStrictEqual(k.categoryCounts(many, CATS)[1].latest.map(function (l) { return l.title; }), ["T5", "T4", "T3"], "at most three titles");
+  assert.deepStrictEqual(k.categoryCounts([], CATS).map(function (c) { return c.count; }), [0, 0, 0, 0]);
+  assert.deepStrictEqual(k.categoryCounts(ITEMS, []), []);
+});
+
+test("the counts read naturally", function () {
+  assert.strictEqual(k.countText(0), "No articles yet");
+  assert.strictEqual(k.countText(1), "1 article");
+  assert.strictEqual(k.countText(12), "12 articles");
+});
+
+test("a section filter keeps only that section, and combines with the other filters", function () {
+  var ids = function (f) { return k.filterItems(ITEMS, f).map(function (i) { return i.id; }); };
+  assert.deepStrictEqual(ids({ category: "certifications" }), ["ka_aaaaaaa1", "ka_aaaaaaa2"]);
+  assert.deepStrictEqual(ids({ category: "certifications", tag: "sc-300" }), ["ka_aaaaaaa1"]);
+  assert.deepStrictEqual(ids({ category: "certifications", q: "cloud" }), ["ka_aaaaaaa2"]);
+  assert.deepStrictEqual(ids({ category: "other" }), ["ka_aaaaaaa4"], "an unknown section name is not Other in a filter, only in the counts");
+  assert.strictEqual(ids({ category: "" }).length, 5);
+  assert.strictEqual(ids({}).length, 5);
+});
+
+test("a draft remembers its section, and a memo with a bad one is refused", function () {
+  var good = read(Object.assign(memo(), { draft: Object.assign(memo().draft, { category: "scripting" }) }));
+  assert.strictEqual(good.draft.category, "scripting");
+  assert.strictEqual(read(memo()).draft.category, "", "an older memo has none");
+  [5, "Bad Id", "x", "UPPER", "a".repeat(30)].forEach(function (bad) {
+    assert.strictEqual(read(Object.assign(memo(), { draft: Object.assign(memo().draft, { category: bad }) })), null, String(bad));
+  });
+});
+
+test("the page is wired for sections: a landing page, a section page, a choice in the editor, and the old flat list as the fallback", function () {
+  var fs = require("fs");
+  var js = fs.readFileSync(path.join(__dirname, "..", "kb.js"), "utf8");
+  var html = fs.readFileSync(path.join(__dirname, "..", "knowledgebase.html"), "utf8");
+  assert.ok(/state\.cats = Array\.isArray\(r\.json\.categories\)/.test(js), "the sections come from /kb/me");
+  assert.ok(/function renderLanding\(/.test(js) && /"#\/c\/" \+ c\.id/.test(js), "the landing page links each section");
+  assert.ok(/shown === "landing"\) renderLanding\(\); else renderLibrary\(\)/.test(js), "no sections from the Worker means the flat list");
+  assert.ok(/body\.category = d\.category/.test(js) && /field\("Section"/.test(js), "the editor can choose and send a section");
+  assert.ok(!/\.innerHTML\s*\+?=|insertAdjacentHTML|document\.write/.test(js), "still no innerHTML");
+  assert.ok(html.indexOf("script-src 'self'") !== -1 && !/\sstyle=/.test(html));
 });
 
 console.log("\n" + passed + " passed");
