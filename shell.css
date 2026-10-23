@@ -184,6 +184,39 @@ a.sub { text-decoration: none; } a.sub:hover { color: var(--fg-strong); text-dec
 .hero { margin: 20px 0 var(--hero-gap); max-width: 880px; }
 .hero h1 { font: 700 clamp(32px, 4.4vw, 48px)/1.04 var(--font-display); letter-spacing: -.028em; color: var(--fg-strong); text-wrap: balance; }
 .hero p { margin-top: 14px; font-size: 16px; color: var(--fg-dim); max-width: 60ch; }
+.ov-status { display: flex; flex-wrap: wrap; gap: 8px; margin: calc(var(--hero-gap) * -0.5) 0 var(--hero-gap); }
+.ov-status a.chip { text-decoration: none; }
+.ov-status .chip-btn { font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--fg); }
+.ov-status .chip-btn:hover:not(:disabled) { border-color: var(--accent); }
+.ov-status .chip-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ov-status .chip-btn.attn { border-color: transparent; }
+.ov-status .chip-btn:disabled { opacity: .6; cursor: progress; }
+.ov-bell { margin: 0 0 var(--hero-gap); max-width: 880px; border: 1px solid var(--line); border-radius: var(--radius, 10px); padding: 6px 16px 10px; }
+.ov-bell-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.ov-bell-head h2 { font: 600 15px var(--font-display); color: var(--fg-strong); }
+.ov-bell ul { list-style: none; margin: 0; padding: 0; }
+.ov-bell li { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.ov-bell li.dim { display: block; color: var(--fg-dim); }
+.ov-bell li a, .ov-bell li > span:first-child { color: var(--fg); text-decoration: none; }
+.ov-bell li.unread a, .ov-bell li.unread > span:first-child { color: var(--fg-strong); font-weight: 600; }
+.ov-bell li.attn a { color: var(--attn); }
+.ov-bell li.alert a { color: var(--alert); }
+.ov-bell .when { color: var(--fg-dim); font-size: 12px; white-space: nowrap; }
+.ov-capture { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 880px; margin: 0 0 var(--hero-gap); }
+.ov-capture input { flex: 1 1 260px; min-width: 0; font: inherit; font-size: 15px; padding: 8px 12px; border-radius: var(--radius, 10px); border: 1px solid var(--line); background: var(--surface, transparent); color: var(--fg-strong); }
+.ov-capture select { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: var(--radius, 10px); border: 1px solid var(--line); background: var(--surface, transparent); color: var(--fg-strong); }
+.ov-capture input:focus-visible, .ov-capture select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ov-capture .dim { font-size: 13px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ov-expiry { margin: 0 0 var(--hero-gap); max-width: 880px; }
+.ov-expiry h2 { display: flex; align-items: baseline; gap: 14px; font: 600 12px var(--font-body, inherit); letter-spacing: .08em; text-transform: uppercase; color: var(--fg-dim); margin-bottom: 6px; }
+.ov-expiry h2 a { font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--fg-dim); font-size: 13px; }
+.ov-expiry ul { list-style: none; margin: 0; padding: 0; }
+.ov-expiry li { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.ov-expiry li:first-child { border-top: 0; }
+.ov-expiry li a { color: var(--fg-strong); text-decoration: none; font-weight: 500; }
+.ov-expiry li .when { color: var(--fg-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ov-expiry li.dim { display: block; color: var(--fg-dim); }
 .widgets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--row-gap) var(--col-gap); align-items: start; }
 .w { min-width: 0; container-type: inline-size; }
 .w[data-size="1"] { grid-column: span 1; } .w[data-size="2"] { grid-column: span 2; } .w[data-size="4"] { grid-column: span 4; }
