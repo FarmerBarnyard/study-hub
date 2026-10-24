@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.barnyard.site; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'self'; form-action 'none';">
 <title>Study &mdash; Barnyard</title>
 <link rel="stylesheet" href="shell.css?v=61714599">
-<link rel="stylesheet" href="study.css?v=9b20d32d">
+<link rel="stylesheet" href="study.css?v=94683a17">
 <script src="themes.js?v=70f6889a"></script>
 </head>
 <body data-shell="study" data-wide>
@@ -16,7 +16,7 @@
   <div class="page-head">
     <div>
       <h1>Study</h1>
-      <p>Paste a link to a Microsoft Learn module, study guide or another vendor&rsquo;s training page and get revision material from it.</p>
+      <p>Paste a link to a Microsoft Learn module, study guide or another vendor&rsquo;s training page and get a study lab from it: notes, a quiz, flashcards, common traps and a checklist.</p>
     </div>
     <p class="nb-open"><a href="certifications.html">Certification list &rarr;</a></p>
   </div>
@@ -28,44 +28,68 @@
     <p><a id="gen-gate-login" class="btn" href="https://api.barnyard.site/auth/login" hidden>Log in</a></p>
   </div>
 
-  <form id="gen-form" class="gen-form" novalidate>
-    <label for="gen-url">Link to the page</label>
-    <input id="gen-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" maxlength="500" placeholder="https://learn.microsoft.com/training/modules/&hellip;" required>
-    <fieldset class="gen-kinds">
-      <legend>Make</legend>
-      <label><input type="checkbox" name="kind" value="notes" checked> Notes</label>
-      <label><input type="checkbox" name="kind" value="flashcards" checked> Flashcards</label>
-      <label><input type="checkbox" name="kind" value="quiz" checked> Practice questions</label>
-    </fieldset>
-    <div class="gen-actions">
-      <button type="submit" class="btn btn-primary" id="gen-go">Generate</button>
-      <span class="gen-note" id="gen-hint">Takes up to a minute. For a Microsoft Learn module, paste the module&rsquo;s own address and every unit is read.</span>
-    </div>
-  </form>
-
-  <p id="gen-status" class="gen-status" role="status" aria-live="polite"></p>
-
-  <section id="gen-result" class="gen-result" aria-label="Revision material" hidden>
-    <div class="gen-result-head">
-      <div>
-        <h2 id="gen-title"></h2>
-        <p class="gen-note" id="gen-source"></p>
-      </div>
+  <section id="sl-start" aria-label="Make a study lab">
+    <form id="gen-form" class="gen-form" novalidate>
+      <label for="gen-url">Link to the page</label>
+      <input id="gen-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" maxlength="500" placeholder="https://learn.microsoft.com/training/modules/&hellip;" required>
+      <fieldset class="gen-kinds">
+        <legend>Make</legend>
+        <label><input type="checkbox" name="kind" value="notes" checked> Notes</label>
+        <label><input type="checkbox" name="kind" value="quiz" checked> Quiz</label>
+        <label><input type="checkbox" name="kind" value="flashcards" checked> Flashcards</label>
+        <label><input type="checkbox" name="kind" value="traps" checked> Traps</label>
+        <label><input type="checkbox" name="kind" value="checklist" checked> Checklist</label>
+      </fieldset>
       <div class="gen-actions">
-        <button type="button" class="btn" id="gen-save">Save to my notes</button>
-        <a class="btn" id="gen-open-note" href="notes.html" hidden>Open the note</a>
+        <button type="submit" class="btn btn-primary" id="gen-go">Generate</button>
+        <span class="gen-note" id="gen-hint">Takes up to a minute. For a Microsoft Learn module, paste the module&rsquo;s own address and every unit is read.</span>
       </div>
+    </form>
+    <p id="gen-status" class="gen-status" role="status" aria-live="polite"></p>
+
+    <div id="sl-library" class="sl-library" hidden>
+      <h2 class="sl-h">Your study labs</h2>
+      <ul id="sl-sets" class="sl-sets"></ul>
+      <p class="gen-note">Saved in this browser, with your progress.</p>
     </div>
-    <div class="gen-tabs" id="gen-tabs" role="tablist" aria-label="Kind of material"></div>
-    <div id="gen-panel" class="gen-panel" role="tabpanel"></div>
   </section>
 
-  <p class="dim study-footer">Your link is read by this site&rsquo;s own server and summarised by Claude; nothing is kept except what you choose to save to your notes. Only the vendor sites on the server&rsquo;s list can be read. Your theme and layout choices are saved in this browser.</p>
+  <section id="lab" class="lab" aria-label="Study lab" hidden>
+    <header class="lab-top">
+      <div class="lab-title">
+        <p class="eyebrow" id="lab-source"></p>
+        <h2 id="lab-title"></h2>
+        <p class="gen-note" id="lab-sub"></p>
+      </div>
+      <div class="gauge" aria-live="polite">
+        <svg viewBox="0 0 84 84" aria-hidden="true">
+          <circle class="gauge-track" cx="42" cy="42" r="34"></circle>
+          <circle class="gauge-arc" id="gauge-arc" cx="42" cy="42" r="34" transform="rotate(-90 42 42)"></circle>
+        </svg>
+        <div>
+          <div class="gauge-label">Readiness</div>
+          <div class="gauge-big" id="gauge-pct">0%</div>
+          <ul class="gauge-parts" id="gauge-parts"></ul>
+        </div>
+      </div>
+    </header>
+    <nav class="lab-tabs" id="lab-tabs" role="tablist" aria-label="Sections"></nav>
+    <div class="lab-views" id="lab-views"></div>
+    <div class="lab-foot">
+      <button type="button" class="btn" id="lab-back">&larr; All study labs</button>
+      <button type="button" class="btn" id="gen-save">Save to my notes</button>
+      <a class="btn" id="gen-open-note" href="notes.html" hidden>Open the note</a>
+    </div>
+  </section>
+
+  <div class="sl-toast" id="sl-toast" role="status"></div>
+
+  <p class="dim study-footer">Your link is read by this site&rsquo;s own server and summarised by Claude; the lab and your progress stay in this browser unless you save it to your notes. Only the vendor sites on the server&rsquo;s list can be read. Your theme and layout choices are saved in this browser.</p>
 
 </main>
 
 <script src="shell.js?v=e1e12694"></script>
 <script src="auth-gate.js?v=a1b7693a"></script>
-<script src="study.js?v=4b66739d"></script>
+<script src="study.js?v=0cf9e01c"></script>
 </body>
 </html>

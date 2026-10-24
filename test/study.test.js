@@ -1,5 +1,6 @@
 // Coverage for study.js's pure helpers (the link the person types, what to say when the server
-// refuses, the quiz score, the Markdown saved to the notebook) and for how the page is wired.
+// refuses, how a stored lab is cleaned before it is drawn, readiness, the quiz and flashcard logic,
+// the Markdown saved to the notebook) and for how the page is wired.
 //
 //   node test/study.test.js
 
@@ -24,7 +25,7 @@ test("a typed link becomes an https address, or nothing", function () {
 });
 
 test("each refusal is said in plain words, and only a missing login offers the log in button", function () {
-  assert.deepStrictEqual(S.errorText(null, 401), { text: "Log in to make revision material.", login: true });
+  assert.deepStrictEqual(S.errorText(null, 401), { text: "Log in to make a study lab.", login: true });
   assert.match(S.errorText("host_not_allowed", 400).text, /isn’t on the list/);
   assert.match(S.errorText("daily_limit", 429).text, /today’s allowance/);
   assert.match(S.errorText("disabled", 410).text, /switched off/);
@@ -36,39 +37,113 @@ test("each refusal is said in plain words, and only a missing login offers the l
   assert.strictEqual(S.errorText("<script>", 500).text, "That didn’t work. Try again.", "server text is never shown");
 });
 
-test("the quiz score counts only what was answered", function () {
-  var qs = [{ answer: 0 }, { answer: 2 }, { answer: 3 }];
-  assert.deepStrictEqual(S.scoreQuiz(qs, {}), { answered: 0, correct: 0, total: 3 });
-  assert.deepStrictEqual(S.scoreQuiz(qs, { 0: 0, 1: 1 }), { answered: 2, correct: 1, total: 3 });
-  assert.strictEqual(S.scoreText(S.scoreQuiz(qs, {})), "Pick an answer for each question.");
-  assert.strictEqual(S.scoreText(S.scoreQuiz(qs, { 0: 0, 1: 1 })), "1 of 2 correct so far (3 questions).");
-  assert.strictEqual(S.scoreText(S.scoreQuiz(qs, { 0: 0, 1: 2, 2: 3 })), "3 of 3 correct.");
-});
-
-var RESULT = {
-  title: "Describe Azure architecture",
-  source: { host: "learn.microsoft.com", pages: 4, truncated: true },
-  notes: [{ heading: "Regions", items: ["A region is a set of datacenters", "Pairs are 300 miles apart"] }],
-  flashcards: [{ front: "Region?", back: "Datacenters in a perimeter" }],
-  quiz: [{ question: "Which is a region pair?", choices: ["East/West", "A/B", "C/D", "E/F"], answer: 0, why: "Pairs are in the same geography." }],
-  failed: []
+var RAW = {
+  id: "0123abcd", title: "Describe Azure architecture", url: "https://learn.microsoft.com/x", host: "learn.microsoft.com", pages: 4, truncated: false, at: 5, failed: [],
+  notes: [{ heading: "Regions", items: ["A region is a set of datacenters", "Pairs are 300 miles apart"] }, { heading: "Groups", items: ["One group per resource"] }],
+  quiz: [0, 1, 2, 3].map(function (n) { return { question: "Q" + n, choices: ["a", "b", "c", "d"], answer: n % 4, why: "because " + n }; }),
+  flashcards: [{ front: "Region?", back: "Datacenters" }, { front: "AZ?", back: "Separate datacenter" }, { front: "Pair?", back: "Two regions" }],
+  traps: [{ mistake: "Global admin", fix: "Use the narrowest role" }],
+  checklist: [{ heading: "Week 1", items: ["Explain regions", "Create a group"] }, { heading: "Week 2", items: ["Assign a role"] }]
 };
 
-test("the saved note holds every kind that was made, with the answers marked", function () {
-  var md = S.toMarkdown(RESULT, "https://learn.microsoft.com/x");
+test("a stored or returned lab is cleaned before it is drawn: odd shapes are dropped, never trusted", function () {
+  var set = S.cleanSet(RAW);
+  assert.strictEqual(set.title, "Describe Azure architecture");
+  assert.strictEqual(set.notes.length, 2);
+  assert.strictEqual(set.quiz.length, 4);
+  assert.strictEqual(S.cleanSet(null), null);
+  assert.strictEqual(S.cleanSet({}), null);
+  assert.strictEqual(S.cleanSet(Object.assign({}, RAW, { id: "../../x" })), null, "the id is a short hex string");
+  assert.strictEqual(S.cleanSet({ id: "0123abcd", title: "T" }), null, "a lab with nothing in it is not a lab");
+  var dirty = S.cleanSet(Object.assign({}, RAW, {
+    url: "javascript:alert(1)", title: "T\u0000itle",
+    quiz: [{ question: "ok", choices: ["a", "b", "c", "d"], answer: 9, why: "" }, { question: "ok", choices: ["a", "b", "c"], answer: 0 }, { question: "good", choices: ["a", "b", "c", "d"], answer: 2, why: "w" }, "x", null],
+    notes: [{ heading: "H", items: [] }, { heading: "", items: ["x"] }, { heading: "<img onerror=x>", items: ["<b>bold</b>"] }],
+    failed: ["quiz", "<script>"]
+  }));
+  assert.strictEqual(dirty.url, "", "only https links are kept");
+  assert.strictEqual(dirty.title, "T itle");
+  assert.deepStrictEqual(dirty.quiz.map(function (q) { return q.question; }), ["good"]);
+  assert.strictEqual(dirty.notes[0].heading, "<img onerror=x>", "text is kept as text, to be shown with textContent");
+  assert.deepStrictEqual(dirty.failed, ["quiz"]);
+});
+
+test("stored progress is cleaned too", function () {
+  assert.deepStrictEqual(S.cleanProgress(null), S.emptyProgress());
+  var p = S.cleanProgress({ notes: { 0: true, 1: false, "x y": true }, known: { 2: true }, check: { "0:1": true, "<b>": true }, best: { pct: 80, right: 8, total: 10 }, tab: "quiz" });
+  assert.deepStrictEqual(p.notes, { 0: true });
+  assert.deepStrictEqual(p.check, { "0:1": true });
+  assert.deepStrictEqual(p.best, { pct: 80, right: 8, total: 10 });
+  assert.strictEqual(p.tab, "quiz");
+  assert.strictEqual(S.cleanProgress({ best: { pct: 500, right: 1, total: 1 }, tab: "evil" }).best, null);
+  assert.strictEqual(S.cleanProgress({ tab: "evil" }).tab, "overview");
+});
+
+test("readiness counts each part that exists, by its weight", function () {
+  var set = S.cleanSet(RAW), p = S.emptyProgress();
+  var r0 = S.readiness(set, p);
+  assert.strictEqual(r0.pct, 0);
+  assert.deepStrictEqual(r0.parts.map(function (x) { return x.text; }), ["Notes 0/2", "Quiz best —", "Cards 0/3 known", "Checklist 0/3"]);
+  p.notes = { 0: true, 1: true }; p.best = { pct: 100, right: 4, total: 4 }; p.known = { 0: true, 1: true, 2: true }; p.check = { "0:0": true, "0:1": true, "1:0": true };
+  assert.strictEqual(S.readiness(set, p).pct, 100);
+  p.known = {}; p.check = {};
+  assert.strictEqual(S.readiness(set, p).pct, Math.round((0.3 + 0.3) / 1.0 * 100));
+  var notesOnly = S.cleanSet({ id: "0123abcd", title: "T", notes: RAW.notes });
+  assert.strictEqual(S.readiness(notesOnly, { notes: { 0: true }, known: {}, check: {}, best: null }).pct, 50, "only the parts that were made count");
+});
+
+test("the tab rail has an overview and one tab for each kind that was made", function () {
+  assert.deepStrictEqual(S.tabsFor(S.cleanSet(RAW)).map(function (t) { return t.key; }), ["overview", "notes", "quiz", "flashcards", "traps", "checklist"]);
+  assert.deepStrictEqual(S.tabsFor(S.cleanSet({ id: "0123abcd", title: "T", quiz: RAW.quiz })).map(function (t) { return t.key; }), ["overview", "quiz"]);
+});
+
+test("the library keeps the newest labs and says which to forget", function () {
+  var l = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  var r = S.libraryAdd(l, { id: "d" }, 3);
+  assert.deepStrictEqual(r.list.map(function (m) { return m.id; }), ["d", "a", "b"]);
+  assert.deepStrictEqual(r.evicted, ["c"]);
+  var again = S.libraryAdd(l, { id: "b", title: "new" }, 3);
+  assert.deepStrictEqual(again.list.map(function (m) { return m.id; }), ["b", "a", "c"], "the same lab replaces itself");
+  assert.deepStrictEqual(again.evicted, []);
+  assert.strictEqual(S.hashId("https://learn.microsoft.com/x"), S.hashId("https://learn.microsoft.com/x"));
+  assert.notStrictEqual(S.hashId("https://learn.microsoft.com/x"), S.hashId("https://learn.microsoft.com/y"));
+  assert.ok(/^[0-9a-f]{8}$/.test(S.hashId("")));
+});
+
+test("shuffling keeps every card once; the card list can show only those still being learned", function () {
+  var order = S.shuffled(10, function () { return 0.3; });
+  assert.deepStrictEqual(order.slice().sort(function (a, b) { return a - b; }), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepStrictEqual(S.cardList([2, 0, 1], { 0: true }, true), [2, 1]);
+  assert.deepStrictEqual(S.cardList([2, 0, 1], { 0: true }, false), [2, 0, 1]);
+});
+
+test("a quiz run is scored in the order the questions were asked", function () {
+  var qs = S.cleanSet(RAW).quiz;                       // answers 0,1,2,3
+  var o = S.quizOutcome(qs, [3, 2, 1, 0], [3, 2, 0, null]);
+  assert.deepStrictEqual(o, { right: 2, total: 4, pct: 50 });
+  assert.strictEqual(S.verdict(90), "ready on this set");
+  assert.strictEqual(S.verdict(75), "close: review the misses");
+  assert.strictEqual(S.verdict(40), "keep studying the notes");
+  assert.deepStrictEqual(S.quizOutcome(qs, [], []), { right: 0, total: 0, pct: 0 });
+});
+
+test("the saved note holds every kind that was made", function () {
+  var md = S.toMarkdown(S.cleanSet(RAW));
   assert.match(md, /^# Describe Azure architecture\n\nSource: https:\/\/learn\.microsoft\.com\/x\n/);
-  assert.match(md, /## Notes\n\n### Regions\n\n- A region is a set of datacenters\n- Pairs are 300 miles apart/);
-  assert.match(md, /## Flashcards\n\n- \*\*Region\?\*\* — Datacenters in a perimeter/);
-  assert.match(md, /## Practice questions\n\n1\. Which is a region pair\?\n   - a\) East\/West\n   - b\) A\/B/);
-  assert.match(md, /   - \*\*Answer: a\.\*\* Pairs are in the same geography\./);
-  var onlyNotes = S.toMarkdown({ title: "T", notes: RESULT.notes }, "");
-  assert.ok(onlyNotes.indexOf("## Flashcards") === -1 && onlyNotes.indexOf("Source:") === -1);
+  assert.match(md, /## Notes\n\n### Regions\n\n- A region is a set of datacenters/);
+  assert.match(md, /## Flashcards\n\n- \*\*Region\?\*\* — Datacenters/);
+  assert.match(md, /## Practice questions\n\n1\. Q0\n   - a\) a\n/);
+  assert.match(md, /   - \*\*Answer: a\.\*\* because 0/);
+  assert.match(md, /## Traps\n\n- \*\*Global admin\*\* — Use the narrowest role/);
+  assert.match(md, /## Checklist\n\n### Week 1\n\n- \[ \] Explain regions\n- \[ \] Create a group/);
+  var notesOnly = S.toMarkdown(S.cleanSet({ id: "0123abcd", title: "T", notes: RAW.notes }));
+  assert.ok(notesOnly.indexOf("## Flashcards") === -1 && notesOnly.indexOf("Source:") === -1);
 });
 
 test("the source line says where it came from and what could not be made", function () {
-  assert.strictEqual(S.sourceLine(RESULT), "From learn.microsoft.com · 4 pages read · only the start of a long page was used");
-  assert.strictEqual(S.sourceLine({ source: { host: "docs.aws.amazon.com", pages: 1 }, failed: ["quiz", "flashcards"] }), "From docs.aws.amazon.com · couldn’t make practice questions or flashcards");
-  assert.strictEqual(S.sourceLine({}), "");
+  assert.strictEqual(S.sourceLine({ host: "learn.microsoft.com", pages: 4, truncated: true, failed: [] }), "From learn.microsoft.com · 4 pages read · only the start of a long page was used");
+  assert.strictEqual(S.sourceLine({ host: "docs.aws.amazon.com", pages: 1, failed: ["quiz", "traps"] }), "From docs.aws.amazon.com · couldn’t make quiz, traps");
+  assert.strictEqual(S.sourceLine({ pages: 1, failed: [] }), "");
 });
 
 test("the page is wired: strict CSP, no inline script or style, no innerHTML, and every control the script needs exists", function () {
@@ -78,9 +153,10 @@ test("the page is wired: strict CSP, no inline script or style, no innerHTML, an
   assert.ok(!/unsafe-inline/.test(html));
   assert.ok(!/<script(?![^>]*\bsrc=)/i.test(html), "no inline script");
   assert.ok(!/\sstyle="/i.test(html), "no inline style");
-  assert.ok(!/innerHTML|insertAdjacentHTML|document\.write/.test(js.replace(/\/\/.*$/gm, "")), "model-written text only goes in as text");
+  assert.ok(!/innerHTML|insertAdjacentHTML|document\.write|outerHTML/.test(js.replace(/\/\/.*$/gm, "")), "model-written text only goes in as text");
+  assert.ok(!/setAttribute\(\s*["']style["']/.test(js), "styles are set through the style object, which the CSP allows");
   var ids = js.match(/\$\("([a-z-]+)"\)/g).map(function (m) { return m.slice(3, -2); });
-  ids.forEach(function (id) { assert.ok(html.indexOf('id="' + id + '"') > -1, "index.html has #" + id); });
+  ids.filter(function (id) { return id !== "sl-flip"; }).forEach(function (id) { assert.ok(html.indexOf('id="' + id + '"') > -1, "index.html has #" + id); });   // (#sl-flip is made by the script, for each card)
   assert.ok(html.indexOf('data-shell="study"') > -1);
   assert.ok(html.indexOf("certifications.html") > -1, "the old certification list is still one click away");
 });
