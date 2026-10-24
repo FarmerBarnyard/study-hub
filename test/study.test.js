@@ -144,6 +144,19 @@ test("a module's units are read teaching units first, and a big course is covere
   assert.deepStrictEqual(S.interleaveUnits(null, 5, 5), []);
 });
 
+test("every reason a part can fail for has a plain sentence, and only the ones that doom every part stop the rest", function () {
+  ["rate_limited", "busy", "auth", "credit", "model", "too_long", "cut_off", "bad_output", "timeout", "unreachable", "bad_request"].forEach(function (r) {
+    assert.ok(S.reasonText(r).length > 20, r);
+    assert.ok(!/undefined|\[object/.test(S.reasonText(r)), r);
+  });
+  assert.match(S.reasonText("credit"), /out of credit/);
+  assert.match(S.reasonText("rate_limited"), /minute/);
+  assert.match(S.reasonText("auth"), /ANTHROPIC_API_KEY/);
+  assert.strictEqual(S.reasonText("<script>"), "Claude couldn’t write that part. Try again.", "an unknown reason is never shown as it came");
+  ["auth", "credit", "model", "too_long", "bad_request"].forEach(function (r) { assert.strictEqual(S.FATAL_REASONS[r], true, r); });
+  ["rate_limited", "busy", "cut_off", "bad_output", "timeout", "unreachable"].forEach(function (r) { assert.ok(!S.FATAL_REASONS[r], r); });
+});
+
 test("a lab says which parts it does not have yet", function () {
   assert.deepStrictEqual(S.missingKinds(S.cleanSet(RAW)), []);
   assert.deepStrictEqual(S.missingKinds(S.cleanSet({ id: "0123abcd", title: "T", notes: RAW.notes, traps: RAW.traps })), ["quiz", "flashcards", "checklist"]);
@@ -156,6 +169,7 @@ test("a lab is made in steps: plan, read pages, write each part, then open the s
   assert.ok(/interleaveUnits/.test(js) && /text_budget/.test(js), "a course is covered evenly and reading stops when the lab is full");
   assert.ok(/READ_AT_ONCE/.test(js) && /MAKE_TIMEOUT_MS/.test(js), "pages are read a few at a time; a part may take minutes");
   assert.ok(/retryKind/.test(js), "a part that failed can be written again");
+  assert.ok(/"traps", "checklist", "flashcards", "quiz", "notes"/.test(js), "the smallest part goes first so the others can read the cached source");
   assert.match(S.errorText("source_too_thin", 422).text, /summary page/);
   assert.match(S.errorText("source_expired", 404).text, /Generate it again/);
 });
