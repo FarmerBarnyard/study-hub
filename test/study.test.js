@@ -29,7 +29,7 @@ test("each refusal is said in plain words, and only a missing login offers the l
   assert.match(S.errorText("host_not_allowed", 400).text, /isn’t on the list/);
   assert.match(S.errorText("daily_limit", 429).text, /today’s allowance/);
   assert.match(S.errorText("disabled", 410).text, /switched off/);
-  assert.match(S.errorText("source_too_thin", 422).text, /not enough text/);
+  assert.match(S.errorText("source_too_thin", 422).text, /summary page/);
   assert.strictEqual(S.errorText("recent_sign_in_required", 403).login, true);
   assert.strictEqual(S.errorText("host_not_allowed", 400).login, false);
   assert.match(S.errorText(null, 403).text, /isn’t set up for Study/);
@@ -133,13 +133,40 @@ test("the source line says where it came from and what could not be made", funct
   assert.strictEqual(S.sourceLine({ pages: 1, failed: [] }), "");
 });
 
+test("a module's units are read teaching units first, and a big course is covered module by module", function () {
+  var m1 = ["a/1-introduction/", "a/2-x/", "a/3-y/", "a/4-z/"], m2 = ["b/1-introduction/", "b/2-p/"], m3 = [];
+  assert.deepStrictEqual(S.unitOrder(m1), ["a/2-x/", "a/3-y/", "a/4-z/", "a/1-introduction/"]);
+  assert.deepStrictEqual(S.unitOrder(null), []);
+  assert.deepStrictEqual(S.interleaveUnits([m1, m2, m3], 60, 5), ["a/2-x/", "b/2-p/", "a/3-y/", "b/1-introduction/", "a/4-z/", "a/1-introduction/"], "the first of every module, then the second of every module, ...");
+  assert.deepStrictEqual(S.interleaveUnits([m1, m2], 3, 5), ["a/2-x/", "b/2-p/", "a/3-y/"], "when the room runs out every module has had its turn");
+  assert.deepStrictEqual(S.interleaveUnits([m1, m2], 60, 1), ["a/2-x/", "b/2-p/"], "and no module gives more than its limit");
+  assert.deepStrictEqual(S.interleaveUnits([m1, m1], 60, 5).length, 4, "no repeats");
+  assert.deepStrictEqual(S.interleaveUnits(null, 5, 5), []);
+});
+
+test("a lab says which parts it does not have yet", function () {
+  assert.deepStrictEqual(S.missingKinds(S.cleanSet(RAW)), []);
+  assert.deepStrictEqual(S.missingKinds(S.cleanSet({ id: "0123abcd", title: "T", notes: RAW.notes, traps: RAW.traps })), ["quiz", "flashcards", "checklist"]);
+});
+
+test("a lab is made in steps: plan, read pages, write each part, then open the saved lab", function () {
+  var js = fs.readFileSync(path.join(__dirname, "..", "study.js"), "utf8").replace(/\/\/.*$/gm, "");
+  ["/study/plan", "/study/page", "/study/make", "/notebook/lab?id="].forEach(function (r) { assert.ok(js.indexOf(r) > -1, r); });
+  assert.ok(js.indexOf("/study/generate") === -1, "the one-shot route is gone");
+  assert.ok(/interleaveUnits/.test(js) && /text_budget/.test(js), "a course is covered evenly and reading stops when the lab is full");
+  assert.ok(/READ_AT_ONCE/.test(js) && /MAKE_TIMEOUT_MS/.test(js), "pages are read a few at a time; a part may take minutes");
+  assert.ok(/retryKind/.test(js), "a part that failed can be written again");
+  assert.match(S.errorText("source_too_thin", 422).text, /summary page/);
+  assert.match(S.errorText("source_expired", 404).text, /Generate it again/);
+});
+
 test("labs and progress live on the server: no browser storage, only the notebook's lab routes", function () {
   var js = fs.readFileSync(path.join(__dirname, "..", "study.js"), "utf8").replace(/\/\/.*$/gm, "");
   assert.ok(!/localStorage|sessionStorage|indexedDB/.test(js), "nothing is kept in the browser");
   ["/notebook/labs", "/notebook/lab?id=", "/notebook/lab-progress"].forEach(function (route) { assert.ok(js.indexOf(route) > -1, route); });
   assert.ok(/method[^;]*"DELETE"|"DELETE", "\/notebook\/lab/.test(js), "a lab can be deleted");
   assert.ok(/keepalive/.test(js), "progress is sent as the page is closed");
-  assert.ok(/j\.saved === true/.test(js), "a lab that could not be saved says so");
+  assert.ok(/labs_full/.test(js), "a library that is full says so");
   assert.strictEqual(typeof S.hashId, "undefined");
   assert.strictEqual(typeof S.libraryAdd, "undefined");
 });
