@@ -6,10 +6,11 @@
 // opened as a lab: a readiness gauge, a tab rail (Overview, Notes, Quiz, Flashcards, Traps,
 // Checklist), topics to tick off as studied, a one-question-at-a-time quiz with a score, flip cards
 // marked known or still learning, and a final-week checklist. The lab and the person's progress are
-// kept in this browser's localStorage (a few labs at most); "Save to my notes" copies a lab to the
-// private notebook as Markdown.
+// kept in the person's own notebook on the server (the Worker saves each lab as it is made, and the
+// page saves progress as it changes), so they can open them again from any device; "Save to my notes"
+// still copies a lab to the notebook as Markdown.
 //
-// Everything that came from the server (or from storage) is put on the page with
+// Everything that came from the server is put on the page with
 // createElement/textContent, never innerHTML: the material is model-written from a web page, so it
 // is data, not markup. The page's CSP has no 'unsafe-inline' either.
 //
@@ -20,8 +21,6 @@
 
   var API = "https://api.barnyard.site";
   var GENERATE_TIMEOUT_MS = 100000;
-  var MAX_LABS = 12;
-  var STORE = "study-lab:v1:";
 
   // The tabs of a lab, in order, and which kind of material each one needs.
   var TABS = [
@@ -75,18 +74,9 @@
 
   function letter(i) { return "abcd".charAt(i); }
 
-  // A short, stable id for a link (FNV-1a), so the same page is the same lab.
-  function hashId(s) {
-    var h = 0x811c9dc5;
-    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0; }
-    var out = h.toString(16);
-    while (out.length < 8) out = "0" + out;
-    return out;
-  }
-
   var text = function (v, max) { return typeof v === "string" ? v.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ").trim().slice(0, max) : ""; };
 
-  // Whatever was stored or came back, made safe to draw: unknown shapes are dropped, never trusted.
+  // Whatever came back, made safe to draw: unknown shapes are dropped, never trusted.
   // -> a lab { id, title, url, host, pages, truncated, at, notes?, quiz?, flashcards?, traps?, checklist?, failed } or null.
   function cleanSet(o) {
     if (!o || typeof o !== "object") return null;
@@ -165,13 +155,6 @@
   // The tabs this lab has: Overview always, then one for each kind that was made.
   function tabsFor(set) { return TABS.filter(function (t) { return !t.kind || set[t.kind]; }); }
 
-  // Library of labs, newest first, at most `max`. -> { list, evicted: [ids] }
-  function libraryAdd(list, meta, max) {
-    var out = [meta].concat(list.filter(function (m) { return m.id !== meta.id; }));
-    var evicted = out.slice(max || MAX_LABS).map(function (m) { return m.id; });
-    return { list: out.slice(0, max || MAX_LABS), evicted: evicted };
-  }
-
   function shuffled(n, rnd) {
     var a = [], i;
     for (i = 0; i < n; i++) a.push(i);
@@ -240,9 +223,9 @@
   }
 
   var helpers = {
-    normalizeLink: normalizeLink, errorText: errorText, letter: letter, hashId: hashId, cleanSet: cleanSet, cleanProgress: cleanProgress, emptyProgress: emptyProgress,
-    readiness: readiness, tabsFor: tabsFor, libraryAdd: libraryAdd, shuffled: shuffled, cardList: cardList, quizOutcome: quizOutcome, verdict: verdict,
-    toMarkdown: toMarkdown, sourceLine: sourceLine, scoreText: scoreText, checklistTotal: checklistTotal, MAX_LABS: MAX_LABS, TABS: TABS
+    normalizeLink: normalizeLink, errorText: errorText, letter: letter, cleanSet: cleanSet, cleanProgress: cleanProgress, emptyProgress: emptyProgress,
+    readiness: readiness, tabsFor: tabsFor, shuffled: shuffled, cardList: cardList, quizOutcome: quizOutcome, verdict: verdict,
+    toMarkdown: toMarkdown, sourceLine: sourceLine, scoreText: scoreText, checklistTotal: checklistTotal, TABS: TABS
   };
   if (typeof document === "undefined") {
     if (typeof module !== "undefined" && module.exports) module.exports = helpers;
@@ -262,17 +245,10 @@
   function btn(label, cls, id) { var b = el("button", "btn" + (cls ? " " + cls : ""), label); b.type = "button"; if (id) b.id = id; return b; }
   function loginUrl() { return typeof root.barnyardLoginUrl === "function" ? root.barnyardLoginUrl() : API + "/auth/login"; }
 
-  // -- storage (every access guarded: it can be missing or full)
-  function load(key) { try { var r = root.localStorage.getItem(STORE + key); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
-  function store(key, val) { try { root.localStorage.setItem(STORE + key, JSON.stringify(val)); return true; } catch (e) { return false; } }
-  function drop(key) { try { root.localStorage.removeItem(STORE + key); } catch (e) { /* nothing to remove */ } }
-  function library() {
-    var l = load("sets");
-    return Array.isArray(l) ? l.filter(function (m) { return m && typeof m.id === "string" && /^[0-9a-f]{8}$/.test(m.id); }) : [];
-  }
-
-  var lab = null;           // { set, progress, tab, quiz, cards }
+  var lab = null;           // { set, progress, tab, quiz, cards, persisted, dirty }
+  var labs = [];            // the list of saved labs, from the server
   var toastTimer = null;
+  var saveTimer = null;
 
   function toast(msg) {
     var t = $("sl-toast");
@@ -281,7 +257,22 @@
     toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1800);
   }
 
-  function saveProgress() { store("progress:" + lab.set.id, lab.progress); }
+  // Progress is saved to the person's notebook a moment after it changes, and straight away when the
+  // page is hidden or the lab is closed.
+  function saveProgress() {
+    if (!lab || !lab.persisted) return;
+    lab.dirty = true;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { flushProgress(false); }, 600);
+  }
+  function flushProgress(keepalive) {
+    clearTimeout(saveTimer);
+    if (!lab || !lab.persisted || !lab.dirty) return;
+    lab.dirty = false;
+    call("POST", "/notebook/lab-progress", { id: lab.set.id, progress: lab.progress, ready: readiness(lab.set, lab.progress).pct }, 20000, keepalive === true);
+  }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") flushProgress(true); });
+  root.addEventListener("pagehide", function () { flushProgress(true); });
 
   function showGate(msg, login) {
     $("gen-gate").hidden = !msg;
@@ -292,10 +283,11 @@
   }
   function say(t) { $("gen-status").textContent = t || ""; }
 
-  function call(method, path, body, timeoutMs) {
+  function call(method, path, body, timeoutMs, keepalive) {
     var ctl = new AbortController();
     var timer = setTimeout(function () { ctl.abort(); }, timeoutMs || 20000);
     var opts = { method: method, credentials: "include", referrerPolicy: "no-referrer", headers: {}, signal: ctl.signal };
+    if (keepalive) opts.keepalive = true;
     if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
     return fetch(API + path, opts).then(function (r) {
       return r.json().catch(function () { return null; }).then(function (j) { return { status: r.status, json: j || {} }; });
@@ -304,19 +296,25 @@
 
   // -- the library of labs
 
+  function loadLibrary() {
+    call("GET", "/notebook/labs").then(function (r) {
+      if (r.status === 200 && r.json && Array.isArray(r.json.labs)) { labs = r.json.labs; renderLibrary(); return; }
+      if (r.status === 401) { var e = errorText(null, 401); showGate(e.text, e.login); }
+    });
+  }
+
   var armedRemove = null;
   function renderLibrary() {
-    var list = library(), box = $("sl-library"), ul = $("sl-sets");
+    var box = $("sl-library"), ul = $("sl-sets");
     clear(ul);
-    box.hidden = !list.length;
-    list.forEach(function (m) {
+    box.hidden = !labs.length;
+    labs.forEach(function (m) {
+      if (!m || typeof m.id !== "string" || !/^[0-9a-f]{8}$/.test(m.id)) return;
       var li = el("li", "sl-set");
       var open = el("button", "sl-set-open");
       open.type = "button";
       open.appendChild(el("span", "sl-set-title", text(m.title, 200) || "Study lab"));
-      var prog = cleanProgress(load("progress:" + m.id));
-      var set = cleanSet(load("set:" + m.id));
-      var pct = set ? readiness(set, prog).pct : 0;
+      var pct = Number.isInteger(m.ready) ? m.ready : 0;
       open.appendChild(el("span", "sl-set-meta", (text(m.host, 100) || "") + (pct ? " · " + pct + "% ready" : "")));
       open.addEventListener("click", function () { openLab(m.id); });
       li.appendChild(open);
@@ -324,38 +322,29 @@
       rm.addEventListener("click", function () {
         if (armedRemove !== m.id) { armedRemove = m.id; renderLibrary(); return; }
         armedRemove = null;
-        removeLab(m.id);
-        renderLibrary();
+        rm.disabled = true;
+        call("DELETE", "/notebook/lab?id=" + encodeURIComponent(m.id)).then(function (r) {
+          if (r.status === 200 || r.status === 404) labs = labs.filter(function (x) { return x.id !== m.id; }); else toast("That lab couldn’t be deleted. Try again.");
+          renderLibrary();
+        });
       });
       li.appendChild(rm);
       ul.appendChild(li);
     });
   }
 
-  function removeLab(id) {
-    store("sets", library().filter(function (m) { return m.id !== id; }));
-    drop("set:" + id); drop("progress:" + id);
-  }
-
-  function saveLab(set) {
-    var meta = { id: set.id, title: set.title, host: set.host, at: set.at };
-    var r = libraryAdd(library(), meta, MAX_LABS);
-    r.evicted.forEach(function (id) { drop("set:" + id); drop("progress:" + id); });
-    var ok = store("set:" + set.id, set);
-    if (ok) store("sets", r.list);
-    return ok;
-  }
-
   // -- opening a lab
 
   function openLab(id) {
-    var set = cleanSet(load("set:" + id));
-    if (!set) { removeLab(id); renderLibrary(); return; }
-    startLab(set, cleanProgress(load("progress:" + id)));
+    call("GET", "/notebook/lab?id=" + encodeURIComponent(id)).then(function (r) {
+      var set = r.status === 200 && r.json && r.json.lab ? cleanSet(Object.assign({}, r.json.lab, { at: r.json.lab.at || r.json.lab.updatedAt })) : null;
+      if (!set) { var e = errorText(r.json && r.json.error, r.status); toast(r.status === 404 ? "That lab is gone." : e.text); loadLibrary(); return; }
+      startLab(set, cleanProgress(r.json.progress), true);
+    });
   }
 
-  function startLab(set, progress) {
-    lab = { set: set, progress: progress, tab: progress.tab, quiz: { order: null, i: 0, ans: [], done: false }, cards: { order: (set.flashcards || []).map(function (_, i) { return i; }), i: 0, only: false }, resetArmed: false };
+  function startLab(set, progress, persisted) {
+    lab = { set: set, progress: progress, persisted: persisted, dirty: false, tab: progress.tab, quiz: { order: null, i: 0, ans: [], done: false }, cards: { order: (set.flashcards || []).map(function (_, i) { return i; }), i: 0, only: false }, resetArmed: false };
     if (!tabsFor(set).some(function (t) { return t.key === lab.tab; })) lab.tab = "overview";
     $("sl-start").hidden = true;
     $("lab").hidden = false;
@@ -372,10 +361,11 @@
   }
 
   function closeLab() {
+    flushProgress(false);
     lab = null;
     $("lab").hidden = true;
     $("sl-start").hidden = false;
-    renderLibrary();
+    loadLibrary();
   }
 
   // -- gauge
@@ -731,15 +721,13 @@
       go.disabled = false;
       if (r.status === 200 && r.json) {
         var j = r.json, src = j.source || {};
-        var raw = { id: hashId(link.split("#")[0]), title: j.title, url: link, host: src.host, pages: src.pages, truncated: src.truncated, at: Date.now(), failed: j.failed,
+        var raw = { id: j.id, title: j.title, url: link, host: src.host, pages: src.pages, truncated: src.truncated, at: j.at || Date.now(), failed: j.failed,
           notes: j.notes, quiz: j.quiz, flashcards: j.flashcards, traps: j.traps, checklist: j.checklist };
         var set = cleanSet(raw);
         if (!set) { say(""); showGate(ERRORS.generation_failed, false); return; }
         say("");
-        drop("progress:" + set.id);                // a fresh lab starts with fresh progress
-        var kept = saveLab(set);
-        startLab(set, emptyProgress());
-        if (!kept) toast("This lab couldn’t be kept in this browser (storage is full or off).");
+        startLab(set, emptyProgress(), j.saved === true);   // the Worker has already saved it, with fresh progress
+        if (j.saved !== true) toast("This lab couldn’t be saved to your account, so it will be gone when you leave. Use Save to my notes to keep a copy.");
         return;
       }
       var e = errorText(r.json && r.json.error, r.status);
@@ -772,5 +760,5 @@
   $("gen-form").addEventListener("submit", onSubmit);
   $("gen-save").addEventListener("click", onSave);
   $("lab-back").addEventListener("click", closeLab);
-  renderLibrary();
+  loadLibrary();
 })(typeof window !== "undefined" ? window : this);
