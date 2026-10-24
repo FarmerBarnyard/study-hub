@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.barnyard.site; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'self'; form-action 'none';">
+<title>Certifications &mdash; Barnyard Study</title>
+<link rel="stylesheet" href="shell.css?v=61714599">
+<link rel="stylesheet" href="style.css?v=011a8b17">
+<script src="themes.js?v=70f6889a"></script>
+</head>
+<body data-shell="study" data-wide>
+
+<main id="page" class="content">
+
+  <div class="page-head">
+    <div>
+      <h1>Certifications</h1>
+      <p>Certifications in progress, and the notes that go with them.</p>
+    </div>
+    <p class="generated-note" id="generated-note"></p>
+    <p class="nb-open"><a href="./">&larr; Study</a></p>
+  </div>
+
+  <noscript>
+    <p class="cert-empty-note">This page needs JavaScript to load the certification list. You can browse the underlying Notion pages directly instead, or view this repo on <a href="https://github.com/FarmerBarnyard/study-hub">GitHub</a>.</p>
+  </noscript>
+
+  <div id="main-content">
+
+    <p class="cert-empty-note" id="loading-note">Loading certifications&hellip;</p>
+
+    <section class="cert-section" aria-labelledby="ongoing-heading">
+      <h2 class="section-heading" id="ongoing-heading">Ongoing</h2>
+      <ul class="cert-list" id="ongoing-list" role="list"></ul>
+    </section>
+
+    <section class="cert-section" aria-labelledby="completed-heading">
+      <h2 class="section-heading" id="completed-heading">Completed</h2>
+      <ul class="cert-list completed" id="completed-list" role="list"></ul>
+    </section>
+
+  </div>
+
+  <p class="dim study-footer">Study hub &mdash; a static page with no third-party tracking. The certification list and pre-authored revision notes are a snapshot, refreshed periodically from Notion by a separate process (see the repo's README) and committed here. The one exception is the &ldquo;Generate revision notes&rdquo; button: clicking it calls a Cloudflare Worker that reads the certification's Notion page and asks Claude to summarize it on your behalf, and caches the result only in this browser. Your theme and layout choices are saved in this browser; your theme, background and density are also kept in a small cookie shared by the barnyard.site pages, so they match everywhere.</p>
+
+</main>
+
+<script src="shell.js?v=e1e12694"></script>
+<script src="auth-gate.js?v=a1b7693a"></script>
+<script src="app.js?v=d4fdbc64"></script>
+</body>
+</html>

@@ -50,6 +50,7 @@
     // `app` is the group-backed app a link needs; a signed-in person whose groups
     // do not include it does not see the link (see Theme.who in themes.js).
     { id: "study", title: "Study", group: "Sites", icon: "book", url: "https://study.barnyard.site/", app: "study" },
+    { id: "notes", title: "Notes", group: "Sites", icon: "note", url: "https://study.barnyard.site/notes.html", app: "study" },
     { id: "kb", title: "Knowledgebase", group: "Sites", icon: "bulb", url: "https://study.barnyard.site/knowledgebase.html", app: "study" },
     { id: "campaign", title: "Campaign", group: "Sites", icon: "map", url: "https://campaign.barnyard.site/", app: "campaign" },
     { id: "stocks", title: "Stocks", group: "Sites", icon: "chart", url: "https://stocks.barnyard.site/" }
@@ -60,6 +61,7 @@
     board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
     chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-7l-5 4v-4H6a2 2 0 01-2-2z"/><path d="M8 9h8M8 12h5"/>',
     shield: '<path d="M12 3l7 3v5.5c0 4.4-3 8.2-7 9.5-4-1.3-7-5.1-7-9.5V6z"/><path d="M12 8v4.5M12 15.5v.01"/>',
+    note: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
     book: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',
     map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',

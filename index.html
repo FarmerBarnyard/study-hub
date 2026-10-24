@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.barnyard.site; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'self'; form-action 'none';">
 <title>Study &mdash; Barnyard</title>
 <link rel="stylesheet" href="shell.css?v=61714599">
-<link rel="stylesheet" href="style.css?v=011a8b17">
+<link rel="stylesheet" href="study.css?v=9b20d32d">
 <script src="themes.js?v=70f6889a"></script>
 </head>
 <body data-shell="study" data-wide>
@@ -16,38 +16,56 @@
   <div class="page-head">
     <div>
       <h1>Study</h1>
-      <p>Certifications in progress, and the notes that go with them.</p>
+      <p>Paste a link to a Microsoft Learn module, study guide or another vendor&rsquo;s training page and get revision material from it.</p>
     </div>
-    <p class="generated-note" id="generated-note"></p>
-    <p class="nb-open"><a href="knowledgebase.html">Knowledgebase &rarr;</a> &nbsp;&nbsp; <a href="notes.html">Open my notes &rarr;</a></p>
+    <p class="nb-open"><a href="certifications.html">Certification list &rarr;</a></p>
   </div>
 
-  <noscript>
-    <p class="cert-empty-note">This page needs JavaScript to load the certification list. You can browse the underlying Notion pages directly instead, or view this repo on <a href="https://github.com/FarmerBarnyard/study-hub">GitHub</a>.</p>
-  </noscript>
+  <noscript><p class="gen-note">This page needs JavaScript.</p></noscript>
 
-  <div id="main-content">
-
-    <p class="cert-empty-note" id="loading-note">Loading certifications&hellip;</p>
-
-    <section class="cert-section" aria-labelledby="ongoing-heading">
-      <h2 class="section-heading" id="ongoing-heading">Ongoing</h2>
-      <ul class="cert-list" id="ongoing-list" role="list"></ul>
-    </section>
-
-    <section class="cert-section" aria-labelledby="completed-heading">
-      <h2 class="section-heading" id="completed-heading">Completed</h2>
-      <ul class="cert-list completed" id="completed-list" role="list"></ul>
-    </section>
-
+  <div id="gen-gate" class="gen-gate" hidden>
+    <p id="gen-gate-msg"></p>
+    <p><a id="gen-gate-login" class="btn" href="https://api.barnyard.site/auth/login" hidden>Log in</a></p>
   </div>
 
-  <p class="dim study-footer">Study hub &mdash; a static page with no third-party tracking. The certification list and pre-authored revision notes are a snapshot, refreshed periodically from Notion by a separate process (see the repo's README) and committed here. The one exception is the &ldquo;Generate revision notes&rdquo; button: clicking it calls a Cloudflare Worker that reads the certification's Notion page and asks Claude to summarize it on your behalf, and caches the result only in this browser. Your theme and layout choices are saved in this browser; your theme, background and density are also kept in a small cookie shared by the barnyard.site pages, so they match everywhere.</p>
+  <form id="gen-form" class="gen-form" novalidate>
+    <label for="gen-url">Link to the page</label>
+    <input id="gen-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" maxlength="500" placeholder="https://learn.microsoft.com/training/modules/&hellip;" required>
+    <fieldset class="gen-kinds">
+      <legend>Make</legend>
+      <label><input type="checkbox" name="kind" value="notes" checked> Notes</label>
+      <label><input type="checkbox" name="kind" value="flashcards" checked> Flashcards</label>
+      <label><input type="checkbox" name="kind" value="quiz" checked> Practice questions</label>
+    </fieldset>
+    <div class="gen-actions">
+      <button type="submit" class="btn btn-primary" id="gen-go">Generate</button>
+      <span class="gen-note" id="gen-hint">Takes up to a minute. For a Microsoft Learn module, paste the module&rsquo;s own address and every unit is read.</span>
+    </div>
+  </form>
+
+  <p id="gen-status" class="gen-status" role="status" aria-live="polite"></p>
+
+  <section id="gen-result" class="gen-result" aria-label="Revision material" hidden>
+    <div class="gen-result-head">
+      <div>
+        <h2 id="gen-title"></h2>
+        <p class="gen-note" id="gen-source"></p>
+      </div>
+      <div class="gen-actions">
+        <button type="button" class="btn" id="gen-save">Save to my notes</button>
+        <a class="btn" id="gen-open-note" href="notes.html" hidden>Open the note</a>
+      </div>
+    </div>
+    <div class="gen-tabs" id="gen-tabs" role="tablist" aria-label="Kind of material"></div>
+    <div id="gen-panel" class="gen-panel" role="tabpanel"></div>
+  </section>
+
+  <p class="dim study-footer">Your link is read by this site&rsquo;s own server and summarised by Claude; nothing is kept except what you choose to save to your notes. Only the vendor sites on the server&rsquo;s list can be read. Your theme and layout choices are saved in this browser.</p>
 
 </main>
 
-<script src="shell.js?v=121d445a"></script>
+<script src="shell.js?v=e1e12694"></script>
 <script src="auth-gate.js?v=a1b7693a"></script>
-<script src="app.js?v=d4fdbc64"></script>
+<script src="study.js?v=4b66739d"></script>
 </body>
 </html>
