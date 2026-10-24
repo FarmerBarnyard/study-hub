@@ -43,7 +43,9 @@ var RAW = {
   quiz: [0, 1, 2, 3].map(function (n) { return { question: "Q" + n, choices: ["a", "b", "c", "d"], answer: n % 4, why: "because " + n }; }),
   flashcards: [{ front: "Region?", back: "Datacenters" }, { front: "AZ?", back: "Separate datacenter" }, { front: "Pair?", back: "Two regions" }],
   traps: [{ mistake: "Global admin", fix: "Use the narrowest role" }],
-  checklist: [{ heading: "Week 1", items: ["Explain regions", "Create a group"] }, { heading: "Week 2", items: ["Assign a role"] }]
+  checklist: [{ heading: "Week 1", items: ["Explain regions", "Create a group"] }, { heading: "Week 2", items: ["Assign a role"] }],
+  labs: [{ title: "Create a group", objective: "Make a group", minutes: 20, needs: ["Entra ID Free", "User Administrator"], steps: [{ text: "Sign in to the Entra admin center", check: "You see the dashboard" }, { text: "Open Groups > All groups" }, { text: "Select New group", check: "" }], cleanup: "Delete the group", exam: "Group management" }],
+  notes_parts: { 1: true, 3: true }
 };
 
 test("a stored or returned lab is cleaned before it is drawn: odd shapes are dropped, never trusted", function () {
@@ -83,17 +85,17 @@ test("readiness counts each part that exists, by its weight", function () {
   var set = S.cleanSet(RAW), p = S.emptyProgress();
   var r0 = S.readiness(set, p);
   assert.strictEqual(r0.pct, 0);
-  assert.deepStrictEqual(r0.parts.map(function (x) { return x.text; }), ["Notes 0/2", "Quiz best —", "Cards 0/3 known", "Checklist 0/3"]);
-  p.notes = { 0: true, 1: true }; p.best = { pct: 100, right: 4, total: 4 }; p.known = { 0: true, 1: true, 2: true }; p.check = { "0:0": true, "0:1": true, "1:0": true };
+  assert.deepStrictEqual(r0.parts.map(function (x) { return x.text; }), ["Notes 0/2", "Lab steps 0/3", "Quiz best —", "Cards 0/3 known", "Checklist 0/3"]);
+  p.notes = { 0: true, 1: true }; p.best = { pct: 100, right: 4, total: 4 }; p.known = { 0: true, 1: true, 2: true }; p.check = { "0:0": true, "0:1": true, "1:0": true }; p.labs = { "0:0": true, "0:1": true, "0:2": true };
   assert.strictEqual(S.readiness(set, p).pct, 100);
-  p.known = {}; p.check = {};
-  assert.strictEqual(S.readiness(set, p).pct, Math.round((0.3 + 0.3) / 1.0 * 100));
+  p.known = {}; p.check = {}; p.labs = {};
+  assert.strictEqual(S.readiness(set, p).pct, 50, "notes (25) and quiz (25) done, the rest not");
   var notesOnly = S.cleanSet({ id: "0123abcd", title: "T", notes: RAW.notes });
   assert.strictEqual(S.readiness(notesOnly, { notes: { 0: true }, known: {}, check: {}, best: null }).pct, 50, "only the parts that were made count");
 });
 
 test("the tab rail has an overview and one tab for each kind that was made", function () {
-  assert.deepStrictEqual(S.tabsFor(S.cleanSet(RAW)).map(function (t) { return t.key; }), ["overview", "notes", "quiz", "flashcards", "traps", "checklist"]);
+  assert.deepStrictEqual(S.tabsFor(S.cleanSet(RAW)).map(function (t) { return t.key; }), ["overview", "notes", "labs", "quiz", "flashcards", "traps", "checklist"]);
   assert.deepStrictEqual(S.tabsFor(S.cleanSet({ id: "0123abcd", title: "T", quiz: RAW.quiz })).map(function (t) { return t.key; }), ["overview", "quiz"]);
 });
 
@@ -157,9 +159,44 @@ test("every reason a part can fail for has a plain sentence, and only the ones t
   ["rate_limited", "busy", "cut_off", "bad_output", "timeout", "unreachable"].forEach(function (r) { assert.ok(!S.FATAL_REASONS[r], r); });
 });
 
+test("hands-on labs are cleaned, counted in readiness, and saved with the lab as Markdown", function () {
+  var set = S.cleanSet(RAW);
+  assert.strictEqual(set.labs.length, 1);
+  assert.deepStrictEqual(set.labs[0].steps[0], { text: "Sign in to the Entra admin center", check: "You see the dashboard" });
+  assert.strictEqual(set.labs[0].minutes, 20);
+  assert.strictEqual(S.labStepsTotal(set), 3);
+  var bad = S.cleanSet(Object.assign({}, RAW, { labs: [{ title: "Two steps", steps: [{ text: "a" }, { text: "b" }] }, { title: "", steps: [{ text: "a" }, { text: "b" }, { text: "c" }] }, null, { title: "Ok", minutes: 99999, needs: "x", steps: [{ text: "a" }, { text: "b" }, { text: "c" }, { nope: 1 }] }] }));
+  assert.deepStrictEqual(bad.labs.map(function (l) { return [l.title, l.minutes, l.needs.length, l.steps.length]; }), [["Ok", 0, 0, 3]], "a lab needs a title and at least three steps");
+  var p = S.emptyProgress(); p.labs = { "0:0": true, "0:1": true, "<b>": true };
+  assert.deepStrictEqual(S.cleanProgress(p).labs, { "0:0": true, "0:1": true });
+  var r = S.readiness(set, S.cleanProgress(p));
+  assert.ok(r.parts.some(function (x) { return x.key === "labs" && x.text === "Lab steps 2/3"; }));
+  var md = S.toMarkdown(set);
+  assert.match(md, /## Hands-on labs\n\n### Create a group \(about 20 minutes\)\n\nMake a group\n\n\*\*You need:\*\*\n\n- Entra ID Free\n- User Administrator\n\n1\. Sign in to the Entra admin center \*\(You should see: You see the dashboard\)\*\n2\. Open Groups > All groups\n3\. Select New group/);
+  assert.match(md, /\*\*Clean up:\*\* Delete the group/);
+  assert.match(md, /\*\*Why it matters for the exam:\*\* Group management/);
+  assert.deepStrictEqual(S.tabsFor(set).map(function (t) { return t.key; }).slice(0, 3), ["overview", "notes", "labs"]);
+});
+
+test("the notes come in three passes: the page asks for each, and knows which a lab is missing", function () {
+  assert.deepStrictEqual(S.writeTasks(["notes", "quiz", "traps", "labs"]).map(function (t) { return t.key; }), ["traps", "labs", "quiz", "notes:1", "notes:2", "notes:3"], "the smallest part first, the notes last");
+  assert.deepStrictEqual(S.writeTasks(["notes"]).map(function (t) { return t.part; }), [1, 2, 3]);
+  assert.deepStrictEqual(S.writeTasks(["flashcards"]), [{ key: "flashcards", kind: "flashcards", part: 1 }]);
+  assert.deepStrictEqual(S.writeTasks([]), []);
+  assert.deepStrictEqual(S.missingNoteParts(S.cleanSet(RAW)), [2], "passes 1 and 3 exist, pass 2 does not");
+  assert.deepStrictEqual(S.missingNoteParts(S.cleanSet({ id: "0123abcd", title: "T", quiz: RAW.quiz })), [1, 2, 3], "no notes at all");
+  assert.deepStrictEqual(S.missingNoteParts(S.cleanSet({ id: "0123abcd", title: "T", notes: RAW.notes })), [], "an older lab with notes counts as complete");
+  assert.deepStrictEqual(S.missingKinds(S.cleanSet({ id: "0123abcd", title: "T", notes: RAW.notes })), ["labs", "quiz", "flashcards", "traps", "checklist"], "notes are handled by their passes");
+});
+
+test("a module's exercises are read first, then the teaching units, the introduction last", function () {
+  var u = ["m/1-introduction/", "m/2-explain/", "m/3-exercise-create-group/", "m/4-more/", "m/5-exercise-assign-roles/"];
+  assert.deepStrictEqual(S.unitOrder(u), ["m/3-exercise-create-group/", "m/5-exercise-assign-roles/", "m/2-explain/", "m/4-more/", "m/1-introduction/"]);
+});
+
 test("a lab says which parts it does not have yet", function () {
   assert.deepStrictEqual(S.missingKinds(S.cleanSet(RAW)), []);
-  assert.deepStrictEqual(S.missingKinds(S.cleanSet({ id: "0123abcd", title: "T", notes: RAW.notes, traps: RAW.traps })), ["quiz", "flashcards", "checklist"]);
+  assert.deepStrictEqual(S.missingKinds(S.cleanSet({ id: "0123abcd", title: "T", notes: RAW.notes, traps: RAW.traps })), ["labs", "quiz", "flashcards", "checklist"]);
 });
 
 test("a lab is made in steps: plan, read pages, write each part, then open the saved lab", function () {
@@ -169,7 +206,8 @@ test("a lab is made in steps: plan, read pages, write each part, then open the s
   assert.ok(/interleaveUnits/.test(js) && /text_budget/.test(js), "a course is covered evenly and reading stops when the lab is full");
   assert.ok(/READ_AT_ONCE/.test(js) && /MAKE_TIMEOUT_MS/.test(js), "pages are read a few at a time; a part may take minutes");
   assert.ok(/retryKind/.test(js), "a part that failed can be written again");
-  assert.ok(/"traps", "checklist", "flashcards", "quiz", "notes"/.test(js), "the smallest part goes first so the others can read the cached source");
+  assert.ok(/pool\(tasks\.slice\(1\), 3\)/.test(js), "no more than three parts are written at once");
+  assert.ok(/"traps", "checklist", "flashcards", "labs", "quiz", "notes"/.test(js), "the smallest part goes first so the others can read the cached source");
   assert.match(S.errorText("source_too_thin", 422).text, /summary page/);
   assert.match(S.errorText("source_expired", 404).text, /Generate it again/);
 });

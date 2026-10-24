@@ -126,6 +126,15 @@
 .face .a { font-size: 17px; font-weight: 600; color: var(--fg-strong); }
 .hint { font: 12px var(--font-mono); color: var(--fg-dim); }
 
+/* hands-on labs */
+.sl-steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; max-width: 80ch; }
+.sl-step { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.sl-step input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--ok); flex: none; }
+.sl-step input:checked + span { color: var(--fg-dim); }
+.sl-check { display: block; font-size: 13px; color: var(--fg-dim); margin-top: 2px; }
+.sl-body > p { margin: 10px 0 4px; }
+.sl-body > .sl-strong { margin-top: 14px; }
+
 /* traps */
 .traps { display: flex; flex-direction: column; gap: 10px; }
 .trap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
