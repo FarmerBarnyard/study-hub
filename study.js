@@ -80,6 +80,24 @@
     return { text: "That didn’t work. Try again.", login: false };
   }
 
+  // Why a part could not be written: the Worker names the reason, never the API's own words.
+  var REASONS = {
+    rate_limited: "Claude is limiting how much this account can send a minute. Wait a minute or two.",
+    busy: "Claude is busy right now. Try again in a minute.",
+    auth: "Claude refused the server's API key. The ANTHROPIC_API_KEY secret on the Worker needs checking.",
+    credit: "The Anthropic account is out of credit. Add credit in the Anthropic console, then try again.",
+    model: "The Claude model the server asks for isn’t available to its API key.",
+    too_long: "That material is too long for Claude in one go. Try a smaller link: a module or a learning path.",
+    cut_off: "Claude’s answer ran out of room and was cut off. Try that part again.",
+    bad_output: "Claude’s answer wasn’t in a usable shape. Try that part again.",
+    timeout: "Claude took too long. Try that part again.",
+    unreachable: "Claude couldn’t be reached from the server. Try again in a moment.",
+    bad_request: "Claude rejected the request. Try again; if it keeps happening, tell Claude Code."
+  };
+  // Reasons that mean the other parts would fail the same way, so there is no point trying them.
+  var FATAL_REASONS = { auth: true, credit: true, model: true, too_long: true, bad_request: true };
+  function reasonText(reason) { return REASONS[reason] || "Claude couldn’t write that part. Try again."; }
+
   function letter(i) { return "abcd".charAt(i); }
 
   var text = function (v, max) { return typeof v === "string" ? v.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ").trim().slice(0, max) : ""; };
@@ -257,7 +275,7 @@
 
   var helpers = {
     normalizeLink: normalizeLink, errorText: errorText, letter: letter, cleanSet: cleanSet, cleanProgress: cleanProgress, emptyProgress: emptyProgress,
-    readiness: readiness, tabsFor: tabsFor, interleaveUnits: interleaveUnits, unitOrder: unitOrder, missingKinds: missingKinds, shuffled: shuffled, cardList: cardList, quizOutcome: quizOutcome, verdict: verdict,
+    readiness: readiness, tabsFor: tabsFor, interleaveUnits: interleaveUnits, unitOrder: unitOrder, missingKinds: missingKinds, reasonText: reasonText, FATAL_REASONS: FATAL_REASONS, shuffled: shuffled, cardList: cardList, quizOutcome: quizOutcome, verdict: verdict,
     toMarkdown: toMarkdown, sourceLine: sourceLine, scoreText: scoreText, checklistTotal: checklistTotal, TABS: TABS
   };
   if (typeof document === "undefined") {
@@ -287,7 +305,7 @@
     var t = $("sl-toast");
     t.textContent = msg; t.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1800);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, Math.max(1800, String(msg).length * 60));
   }
 
   // Progress is saved to the person's notebook a moment after it changes, and straight away when the
@@ -759,7 +777,7 @@
   function makePart(id, kind) {
     return call("POST", "/study/make", { id: id, kind: kind }, MAKE_TIMEOUT_MS).then(function (r) {
       if (r.status === 200 && r.json && r.json.ok === true) return r.json;
-      return { ok: false, error: (r.json && r.json.error) || "generation_failed", status: r.status, kind: kind };
+      return { ok: false, error: (r.json && r.json.error) || "generation_failed", reason: r.json && r.json.reason, status: r.status, kind: kind };
     });
   }
 
@@ -771,10 +789,9 @@
     button.textContent = "Writing " + kindLabel(kind).toLowerCase() + "…";
     makePart(id, kind).then(function (res) {
       if (res.ok) { toast(kindLabel(kind) + " added."); openLab(id); return; }
-      var e = errorText(res.error, res.status || 0);
       button.disabled = false;
       button.textContent = kindLabel(kind);
-      toast(e.text);
+      toast(res.reason ? reasonText(res.reason) : errorText(res.error, res.status || 0).text);
     });
   }
 
@@ -833,16 +850,29 @@
         say("Reading page " + done + " of " + total + (total > 1 ? " (more are found as modules are read)" : "") + "…");
       }).then(function (rd) {
         if (rd.fatal) { stop(rd.fatal); return; }
-        var pending = kinds.length, wrote = [], bad = [], firstBad = null, kept = false;
-        function status() { say("Writing: " + kinds.map(function (k) { return kindLabel(k) + (wrote.indexOf(k) > -1 ? " ✓" : bad.indexOf(k) > -1 ? " ✗" : " …"); }).join(" · ") + ". This can take a couple of minutes."); }
-        status();
-        return Promise.all(kinds.map(function (k) {
+        var wrote = [], bad = [], firstBad = null, kept = false;
+        function status() { say("Writing: " + kinds.map(function (k) { return kindLabel(k) + (wrote.indexOf(k) > -1 ? " ✓" : bad.indexOf(k) > -1 ? " ✗" : " …"); }).join(" · ") + ". This can take a few minutes."); }
+        function run(k) {
           return makePart(id, k).then(function (res) {
             if (res.ok) { wrote.push(k); if (res.saved === true) kept = true; } else { bad.push(k); firstBad = firstBad || res; }
-            pending--; status();
+            status();
+            return res;
           });
-        })).then(function () {
-          if (!wrote.length) { stop({ status: (firstBad && firstBad.status) || 0, json: { error: firstBad && firstBad.error } }); return; }
+        }
+        status();
+        // The smallest part goes first, alone: the pages are then cached on Claude's side, and the other four
+        // (sent together) read them from the cache instead of each counting against the account's limit.
+        var order = ["traps", "checklist", "flashcards", "quiz", "notes"].filter(function (k) { return kinds.indexOf(k) > -1; });
+        return run(order[0]).then(function (first) {
+          if (!first.ok && (FATAL_REASONS[first.reason] || first.error === "source_too_thin" || first.error === "source_expired")) {
+            go.disabled = false; say("");
+            showGate(first.reason ? reasonText(first.reason) : errorText(first.error, first.status || 0).text, false);
+            return null;
+          }
+          return Promise.all(order.slice(1).map(run)).then(function () { return true; });
+        }).then(function (went) {
+          if (!went) return;
+          if (!wrote.length) { go.disabled = false; say(""); showGate(firstBad && firstBad.reason ? reasonText(firstBad.reason) : ERRORS.generation_failed, false); return; }
           if (!kept) { stop({ status: 409, json: { error: "labs_full" } }); return; }
           return call("GET", "/notebook/lab?id=" + encodeURIComponent(id)).then(function (r) {
             go.disabled = false;
@@ -850,7 +880,7 @@
             say("");
             if (!set) { showGate(ERRORS.generation_failed, false); return; }
             startLab(set, cleanProgress(r.json.progress), true);
-            if (bad.length) toast("Couldn’t write: " + bad.map(kindLabel).join(", ") + ". They can be added from the Overview.");
+            if (bad.length) toast("Couldn’t write: " + bad.map(kindLabel).join(", ") + ". " + (firstBad && firstBad.reason ? reasonText(firstBad.reason) + " " : "") + "Add them from the Overview.");
           });
         });
       });
