@@ -1,8 +1,10 @@
 // Study page (index.html): a study lab made from a vendor link.
 //
-// The person pastes a link (a Microsoft Learn module or study guide, an AWS or Google Cloud doc, ...),
-// picks what to make, and the page asks the Worker (POST /study/generate, see ClaudeRepo's
-// cloudflare-worker README, "Study: revision material from a vendor link"). What comes back is
+// The person pastes a link (a Microsoft Learn course, learning path, module or study guide, an AWS or
+// Google Cloud doc, ...), picks what to make, and the page works through it with the Worker in steps
+// (see ClaudeRepo's cloudflare-worker README, "Study: revision material from a vendor link"): plan which
+// pages to read, read them a few at a time (a module's unit pages are found as its outline is read), then
+// ask for each part of the lab. Each part is saved on the server as it is written. What is made is
 // opened as a lab: a readiness gauge, a tab rail (Overview, Notes, Quiz, Flashcards, Traps,
 // Checklist), topics to tick off as studied, a one-question-at-a-time quiz with a score, flip cards
 // marked known or still learning, and a final-week checklist. The lab and the person's progress are
@@ -20,7 +22,9 @@
   "use strict";
 
   var API = "https://api.barnyard.site";
-  var GENERATE_TIMEOUT_MS = 100000;
+  var STEP_TIMEOUT_MS = 30000;      // planning or reading one page
+  var MAKE_TIMEOUT_MS = 240000;     // writing one part can take a couple of minutes
+  var READ_AT_ONCE = 4;             // pages read at the same time
 
   // The tabs of a lab, in order, and which kind of material each one needs.
   var TABS = [
@@ -54,7 +58,11 @@
     kinds_invalid: "Pick at least one thing to make.",
     source_redirected_away: "That link goes somewhere this page can’t read.",
     source_not_a_page: "That link isn’t a web page this page can read.",
-    source_too_thin: "There’s not enough text on that page to make a lab from. Try the module’s own page, or a study guide.",
+    source_too_thin: "There’s not enough to revise from at that link: it looks like a summary page. Paste a learning path, a module or an exam study guide instead.",
+    source_expired: "That lab’s pages are no longer held. Generate it again from the link.",
+    make_limit: "That lab has used all its retries. Generate it again from the link.",
+    page_budget: "That lab has already read as many pages as it can.",
+    labs_full: "Your library of study labs is full (200). Delete some you no longer need, then make this one again.",
     source_unavailable: "That page couldn’t be opened. Check the link.",
     source_unreachable: "That page couldn’t be reached right now. Try again in a moment.",
     daily_limit: "You’ve used today’s allowance. It resets tomorrow.",
@@ -174,6 +182,31 @@
 
   function verdict(pct) { return pct >= 85 ? "ready on this set" : pct >= 70 ? "close: review the misses" : "keep studying the notes"; }
 
+  // A module's unit pages in the order to read them: the teaching units first, the short introduction last.
+  function unitOrder(units) {
+    var list = (Array.isArray(units) ? units : []).filter(function (u) { return typeof u === "string"; });
+    var intro = list.filter(function (u) { return /\/1-introduction\/$/.test(u); });
+    return list.filter(function (u) { return intro.indexOf(u) === -1; }).concat(intro);
+  }
+
+  // The unit pages to read across all the modules of a course: the first page of every module, then the
+  // second of every module, and so on, so that when the lab runs out of room every module has been
+  // covered about equally. No repeats; at most `room` pages; at most `each` from one module.
+  function interleaveUnits(lists, room, each) {
+    var out = [], seen = {}, rank, i;
+    var ordered = (Array.isArray(lists) ? lists : []).map(function (l) { return unitOrder(l).slice(0, each); });
+    for (rank = 0; rank < each && out.length < room; rank++) {
+      for (i = 0; i < ordered.length && out.length < room; i++) {
+        var u = ordered[i][rank];
+        if (u && !seen[u]) { seen[u] = true; out.push(u); }
+      }
+    }
+    return out;
+  }
+
+  // Which parts a lab does not have yet, in the order they are shown.
+  function missingKinds(set) { return KIND_ORDER.filter(function (k) { return !set[k]; }); }
+
   // The whole lab as Markdown, for the notebook. Only the parts that were made are included.
   function toMarkdown(set) {
     var out = ["# " + set.title, ""];
@@ -224,7 +257,7 @@
 
   var helpers = {
     normalizeLink: normalizeLink, errorText: errorText, letter: letter, cleanSet: cleanSet, cleanProgress: cleanProgress, emptyProgress: emptyProgress,
-    readiness: readiness, tabsFor: tabsFor, shuffled: shuffled, cardList: cardList, quizOutcome: quizOutcome, verdict: verdict,
+    readiness: readiness, tabsFor: tabsFor, interleaveUnits: interleaveUnits, unitOrder: unitOrder, missingKinds: missingKinds, shuffled: shuffled, cardList: cardList, quizOutcome: quizOutcome, verdict: verdict,
     toMarkdown: toMarkdown, sourceLine: sourceLine, scoreText: scoreText, checklistTotal: checklistTotal, TABS: TABS
   };
   if (typeof document === "undefined") {
@@ -432,6 +465,19 @@
       });
       p.appendChild(grid);
     }
+    var missing = missingKinds(set);
+    if (missing.length && lab.persisted) {
+      var gap = el("div", "sl-panel");
+      gap.appendChild(el("h3", null, "Not made yet"));
+      gap.appendChild(el("p", "gen-note", "These parts aren’t in this lab. Each one is written from the pages already read."));
+      var row = el("div", "sl-row");
+      missing.forEach(function (k) {
+        var b = btn(kindLabel(k)); b.addEventListener("click", function () { retryKind(k, b); });
+        row.appendChild(b);
+      });
+      gap.appendChild(row);
+      p.appendChild(gap);
+    }
     var panel = el("div", "sl-panel");
     panel.appendChild(el("h3", null, "In this lab"));
     var ul = el("ul", "sl-facts");
@@ -450,6 +496,8 @@
     }
     p.appendChild(panel);
   }
+
+  function kindLabel(k) { return { notes: "Notes", quiz: "Quiz", flashcards: "Flashcards", traps: "Traps", checklist: "Checklist" }[k] || k; }
 
   // -- notes
 
@@ -707,32 +755,105 @@
     return out;
   }
 
+  // Ask for one part; the answer arrives as JSON after a few spaces of keep-alive. -> { ok, kind, value } or { ok: false, error }
+  function makePart(id, kind) {
+    return call("POST", "/study/make", { id: id, kind: kind }, MAKE_TIMEOUT_MS).then(function (r) {
+      if (r.status === 200 && r.json && r.json.ok === true) return r.json;
+      return { ok: false, error: (r.json && r.json.error) || "generation_failed", status: r.status, kind: kind };
+    });
+  }
+
+  // Add a missing part to the lab that is open, then open the saved lab again.
+  function retryKind(kind, button) {
+    if (!lab || !lab.persisted) return;
+    var id = lab.set.id;
+    button.disabled = true;
+    button.textContent = "Writing " + kindLabel(kind).toLowerCase() + "…";
+    makePart(id, kind).then(function (res) {
+      if (res.ok) { toast(kindLabel(kind) + " added."); openLab(id); return; }
+      var e = errorText(res.error, res.status || 0);
+      button.disabled = false;
+      button.textContent = kindLabel(kind);
+      toast(e.text);
+    });
+  }
+
+  // Read the pages in two rounds, a few at a time. First the page given and every module's outline; then,
+  // with the unit pages those outlines listed, a fair share from each module (see interleaveUnits).
+  // -> { fatal, read } ; fatal is the first answer that should stop everything (a failed first page, a
+  // refusal, the day's limit), anything else a page fails on is skipped.
+  function readPages(id, pages, limit, onProgress) {
+    var done = 0, total = pages.length, fatal = null, full = false, read = 0;
+    function round(items) {
+      var next = 0, results = [];
+      function worker() {
+        if (fatal || full || next >= items.length) return Promise.resolve();
+        var at = next++, item = items[at];
+        return call("POST", "/study/page", { id: id, url: item.url, tier: item.tier }, STEP_TIMEOUT_MS).then(function (r) {
+          if (r.status === 200 && r.json) { read++; results[at] = r.json.units || []; }
+          else if (r.status === 409 && r.json && (r.json.error === "text_budget" || r.json.error === "page_budget")) full = true;
+          else if (item.tier === 0 || r.status === 401 || r.status === 403 || r.status === 429 || r.status === 410) fatal = r;
+          done++;
+          onProgress(done, total);
+          return worker();
+        });
+      }
+      var pool = [];
+      for (var i = 0; i < READ_AT_ONCE; i++) pool.push(worker());
+      return Promise.all(pool).then(function () { return results; });
+    }
+    return round(pages).then(function (found) {
+      if (fatal || full) return;
+      var picked = interleaveUnits(found.filter(Boolean), Math.max(0, limit - pages.length), 5);
+      total += picked.length;
+      return round(picked.map(function (u) { return { url: u, tier: 2 }; }));
+    }).then(function () { return { fatal: fatal, read: read }; });
+  }
+
   function onSubmit(ev) {
     ev.preventDefault();
     var link = normalizeLink($("gen-url").value);
     var kinds = chosenKinds();
     showGate("");
-    if (!link) { say("Paste the address of a web page, for example a Microsoft Learn module."); return; }
+    if (!link) { say("Paste the address of a web page, for example a Microsoft Learn course or module."); return; }
     if (!kinds.length) { say(ERRORS.kinds_invalid); return; }
     var go = $("gen-go");
     go.disabled = true;
-    say("Reading the page and building your lab. This can take up to a minute…");
-    call("POST", "/study/generate", { url: link, kinds: kinds }, GENERATE_TIMEOUT_MS).then(function (r) {
+    function stop(r) {
       go.disabled = false;
-      if (r.status === 200 && r.json) {
-        var j = r.json, src = j.source || {};
-        var raw = { id: j.id, title: j.title, url: link, host: src.host, pages: src.pages, truncated: src.truncated, at: j.at || Date.now(), failed: j.failed,
-          notes: j.notes, quiz: j.quiz, flashcards: j.flashcards, traps: j.traps, checklist: j.checklist };
-        var set = cleanSet(raw);
-        if (!set) { say(""); showGate(ERRORS.generation_failed, false); return; }
-        say("");
-        startLab(set, emptyProgress(), j.saved === true);   // the Worker has already saved it, with fresh progress
-        if (j.saved !== true) toast("This lab couldn’t be saved to your account, so it will be gone when you leave. Use Save to my notes to keep a copy.");
-        return;
-      }
       var e = errorText(r.json && r.json.error, r.status);
       say("");
       showGate(e.text, e.login);
+    }
+    say("Working out which pages to read…");
+    call("POST", "/study/plan", { url: link }, STEP_TIMEOUT_MS).then(function (p) {
+      if (p.status !== 200 || !p.json || !p.json.id) { stop(p); return; }
+      var id = p.json.id, limit = (p.json.limits && p.json.limits.pages) || 60;
+      return readPages(id, p.json.pages || [], limit, function (done, total) {
+        say("Reading page " + done + " of " + total + (total > 1 ? " (more are found as modules are read)" : "") + "…");
+      }).then(function (rd) {
+        if (rd.fatal) { stop(rd.fatal); return; }
+        var pending = kinds.length, wrote = [], bad = [], firstBad = null, kept = false;
+        function status() { say("Writing: " + kinds.map(function (k) { return kindLabel(k) + (wrote.indexOf(k) > -1 ? " ✓" : bad.indexOf(k) > -1 ? " ✗" : " …"); }).join(" · ") + ". This can take a couple of minutes."); }
+        status();
+        return Promise.all(kinds.map(function (k) {
+          return makePart(id, k).then(function (res) {
+            if (res.ok) { wrote.push(k); if (res.saved === true) kept = true; } else { bad.push(k); firstBad = firstBad || res; }
+            pending--; status();
+          });
+        })).then(function () {
+          if (!wrote.length) { stop({ status: (firstBad && firstBad.status) || 0, json: { error: firstBad && firstBad.error } }); return; }
+          if (!kept) { stop({ status: 409, json: { error: "labs_full" } }); return; }
+          return call("GET", "/notebook/lab?id=" + encodeURIComponent(id)).then(function (r) {
+            go.disabled = false;
+            var set = r.status === 200 && r.json && r.json.lab ? cleanSet(Object.assign({}, r.json.lab, { at: r.json.lab.at || r.json.lab.updatedAt })) : null;
+            say("");
+            if (!set) { showGate(ERRORS.generation_failed, false); return; }
+            startLab(set, cleanProgress(r.json.progress), true);
+            if (bad.length) toast("Couldn’t write: " + bad.map(kindLabel).join(", ") + ". They can be added from the Overview.");
+          });
+        });
+      });
     });
   }
 
