@@ -97,19 +97,6 @@ test("the tab rail has an overview and one tab for each kind that was made", fun
   assert.deepStrictEqual(S.tabsFor(S.cleanSet({ id: "0123abcd", title: "T", quiz: RAW.quiz })).map(function (t) { return t.key; }), ["overview", "quiz"]);
 });
 
-test("the library keeps the newest labs and says which to forget", function () {
-  var l = [{ id: "a" }, { id: "b" }, { id: "c" }];
-  var r = S.libraryAdd(l, { id: "d" }, 3);
-  assert.deepStrictEqual(r.list.map(function (m) { return m.id; }), ["d", "a", "b"]);
-  assert.deepStrictEqual(r.evicted, ["c"]);
-  var again = S.libraryAdd(l, { id: "b", title: "new" }, 3);
-  assert.deepStrictEqual(again.list.map(function (m) { return m.id; }), ["b", "a", "c"], "the same lab replaces itself");
-  assert.deepStrictEqual(again.evicted, []);
-  assert.strictEqual(S.hashId("https://learn.microsoft.com/x"), S.hashId("https://learn.microsoft.com/x"));
-  assert.notStrictEqual(S.hashId("https://learn.microsoft.com/x"), S.hashId("https://learn.microsoft.com/y"));
-  assert.ok(/^[0-9a-f]{8}$/.test(S.hashId("")));
-});
-
 test("shuffling keeps every card once; the card list can show only those still being learned", function () {
   var order = S.shuffled(10, function () { return 0.3; });
   assert.deepStrictEqual(order.slice().sort(function (a, b) { return a - b; }), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
@@ -144,6 +131,17 @@ test("the source line says where it came from and what could not be made", funct
   assert.strictEqual(S.sourceLine({ host: "learn.microsoft.com", pages: 4, truncated: true, failed: [] }), "From learn.microsoft.com · 4 pages read · only the start of a long page was used");
   assert.strictEqual(S.sourceLine({ host: "docs.aws.amazon.com", pages: 1, failed: ["quiz", "traps"] }), "From docs.aws.amazon.com · couldn’t make quiz, traps");
   assert.strictEqual(S.sourceLine({ pages: 1, failed: [] }), "");
+});
+
+test("labs and progress live on the server: no browser storage, only the notebook's lab routes", function () {
+  var js = fs.readFileSync(path.join(__dirname, "..", "study.js"), "utf8").replace(/\/\/.*$/gm, "");
+  assert.ok(!/localStorage|sessionStorage|indexedDB/.test(js), "nothing is kept in the browser");
+  ["/notebook/labs", "/notebook/lab?id=", "/notebook/lab-progress"].forEach(function (route) { assert.ok(js.indexOf(route) > -1, route); });
+  assert.ok(/method[^;]*"DELETE"|"DELETE", "\/notebook\/lab/.test(js), "a lab can be deleted");
+  assert.ok(/keepalive/.test(js), "progress is sent as the page is closed");
+  assert.ok(/j\.saved === true/.test(js), "a lab that could not be saved says so");
+  assert.strictEqual(typeof S.hashId, "undefined");
+  assert.strictEqual(typeof S.libraryAdd, "undefined");
 });
 
 test("the page is wired: strict CSP, no inline script or style, no innerHTML, and every control the script needs exists", function () {
