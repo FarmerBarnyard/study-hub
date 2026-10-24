@@ -487,7 +487,7 @@
     if (set.traps) ul.appendChild(el("li", null, set.traps.length + " common traps"));
     if (set.checklist) ul.appendChild(el("li", null, checklistTotal(set) + " things to be able to explain or do"));
     panel.appendChild(ul);
-    panel.appendChild(el("p", "gen-note", "Readiness counts topics studied, your best quiz score, cards marked known and checklist items ticked. Your progress stays in this browser."));
+    panel.appendChild(el("p", "gen-note", "Readiness counts topics studied, your best quiz score, cards marked known and checklist items ticked. Your progress is saved to your account, so it is here next time and on any device."));
     if (set.url) {
       var a = el("a", null, "Open the source page");
       a.href = set.url; a.target = "_blank"; a.rel = "noopener noreferrer";
