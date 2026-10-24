@@ -23,7 +23,7 @@
 
   var API = "https://api.barnyard.site";
   var STEP_TIMEOUT_MS = 30000;      // planning or reading one page
-  var MAKE_TIMEOUT_MS = 240000;     // writing one part can take a couple of minutes
+  var MAKE_TIMEOUT_MS = 300000;     // writing one part can take a few minutes
   var READ_AT_ONCE = 4;             // pages read at the same time
 
   // The tabs of a lab, in order, and which kind of material each one needs.
