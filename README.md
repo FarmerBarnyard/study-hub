@@ -4,6 +4,13 @@ Static site at [study.barnyard.site](https://study.barnyard.site/), listing ongo
 
 No build step, no framework — plain HTML/CSS/vanilla JS, deployed via GitHub Pages, same conventions as the barnyard-hub and market-dashboard repos in this account.
 
+## Pages (2026-10-24)
+
+- `index.html` / `study.js` / `study.css` -- **Study**: paste a Microsoft Learn (or other vendor) link and get notes, flashcards and practice questions, with "Save to my notes". Calls the Worker's `POST /study/generate` (ClaudeRepo's cloudflare-worker README, "Study: revision material from a vendor link"); that route is **off until the Worker variable `STUDY_GEN_ENABLED` is `"1"`** and needs `ANTHROPIC_API_KEY`. Until then the page says it is switched off.
+- `notes.html` / `notes.js` -- **Notes**, the private notebook, now its own tab in the sidebar (`data-shell="notes"`).
+- `knowledgebase.html` -- **Knowledgebase**.
+- `certifications.html` / `app.js` -- the old Study page (ongoing and completed certifications from Notion, with its revision notes), kept one click away from Study.
+
 ## Architecture
 
 - `index.html` / `style.css` / `app.js` — the page shell and renderer. `app.js` fetches `data.json` client-side and builds the ongoing/completed lists; revision notes (`notes/*.html`) are fetched lazily, only when a cert's "Revision notes" `<details>` is expanded.
