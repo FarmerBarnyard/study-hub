@@ -30,12 +30,14 @@
   var TABS = [
     { key: "overview", label: "Overview", kind: null },
     { key: "notes", label: "Notes", kind: "notes" },
+    { key: "labs", label: "Hands-on labs", kind: "labs" },
     { key: "quiz", label: "Quiz", kind: "quiz" },
     { key: "flashcards", label: "Flashcards", kind: "flashcards" },
     { key: "traps", label: "Traps", kind: "traps" },
     { key: "checklist", label: "Checklist", kind: "checklist" }
   ];
-  var KIND_ORDER = ["notes", "quiz", "flashcards", "traps", "checklist"];
+  var KIND_ORDER = ["notes", "labs", "quiz", "flashcards", "traps", "checklist"];
+  var NOTES_PARTS = 3;               // the notes are written in this many passes (the Worker's NOTES_PARTS)
 
   // ---- 1. pure helpers --------------------------------------------------------------------
 
@@ -115,8 +117,8 @@
     };
     var n;
     if (Array.isArray(o.notes)) {
-      n = o.notes.map(function (s) { return s && typeof s === "object" ? { heading: text(s.heading, 200), items: (Array.isArray(s.items) ? s.items : []).map(function (i) { return text(i, 1500); }).filter(Boolean).slice(0, 20) } : null; })
-        .filter(function (s) { return s && s.heading && s.items.length; }).slice(0, 20);
+      n = o.notes.map(function (s) { return s && typeof s === "object" ? { heading: text(s.heading, 200), items: (Array.isArray(s.items) ? s.items : []).map(function (i) { return text(i, 2000); }).filter(Boolean).slice(0, 20) } : null; })
+        .filter(function (s) { return s && s.heading && s.items.length; }).slice(0, 60);
       if (n.length) set.notes = n;
     }
     if (Array.isArray(o.quiz)) {
@@ -144,16 +146,28 @@
         .filter(function (g) { return g && g.heading && g.items.length; }).slice(0, 10);
       if (n.length) set.checklist = n;
     }
+    if (Array.isArray(o.labs)) {
+      n = o.labs.map(function (l) {
+        if (!l || typeof l !== "object" || !Array.isArray(l.steps)) return null;
+        var steps = l.steps.map(function (x) { return x && typeof x === "object" ? { text: text(x.text, 700), check: text(x.check, 400) } : null; }).filter(function (x) { return x && x.text; }).slice(0, 20);
+        var title = text(l.title, 200);
+        if (!title || steps.length < 3) return null;
+        return { title: title, objective: text(l.objective, 400), minutes: Number.isInteger(l.minutes) && l.minutes > 0 && l.minutes <= 480 ? l.minutes : 0,
+          needs: (Array.isArray(l.needs) ? l.needs : []).map(function (x) { return text(x, 400); }).filter(Boolean).slice(0, 8), steps: steps, cleanup: text(l.cleanup, 700), exam: text(l.exam, 400) };
+      }).filter(Boolean).slice(0, 14);
+      if (n.length) set.labs = n;
+    }
+    set.noteParts = o.notes_parts && typeof o.notes_parts === "object" ? Object.keys(o.notes_parts).map(Number).filter(function (k) { return k >= 1 && k <= NOTES_PARTS; }) : (set.notes ? [1, 2, 3] : []);
     return KIND_ORDER.some(function (k) { return set[k]; }) ? set : null;
   }
 
-  function emptyProgress() { return { notes: {}, known: {}, check: {}, best: null, tab: "overview" }; }
+  function emptyProgress() { return { notes: {}, known: {}, check: {}, labs: {}, best: null, tab: "overview" }; }
 
   function cleanProgress(o) {
     var p = emptyProgress();
     if (!o || typeof o !== "object") return p;
-    ["notes", "known", "check"].forEach(function (k) {
-      if (o[k] && typeof o[k] === "object" && !Array.isArray(o[k])) Object.keys(o[k]).slice(0, 400).forEach(function (id) { if (o[k][id] === true && /^[a-z0-9:_-]{1,20}$/i.test(id)) p[k][id] = true; });
+    ["notes", "known", "check", "labs"].forEach(function (k) {
+      if (o[k] && typeof o[k] === "object" && !Array.isArray(o[k])) Object.keys(o[k]).slice(0, 600).forEach(function (id) { if (o[k][id] === true && /^[a-z0-9:_-]{1,20}$/i.test(id)) p[k][id] = true; });
     });
     if (o.best && Number.isInteger(o.best.pct) && o.best.pct >= 0 && o.best.pct <= 100 && Number.isInteger(o.best.right) && Number.isInteger(o.best.total)) p.best = { pct: o.best.pct, right: o.best.right, total: o.best.total };
     if (typeof o.tab === "string" && TABS.some(function (t) { return t.key === o.tab; })) p.tab = o.tab;
@@ -163,13 +177,15 @@
   function checklistTotal(set) { return (set.checklist || []).reduce(function (n, g) { return n + g.items.length; }, 0); }
   function count(map) { return Object.keys(map).filter(function (k) { return map[k]; }).length; }
 
-  var WEIGHTS = { notes: 0.3, flashcards: 0.2, quiz: 0.3, checklist: 0.2 };
+  var WEIGHTS = { notes: 0.25, labs: 0.2, quiz: 0.25, flashcards: 0.15, checklist: 0.15 };
+  function labStepsTotal(set) { return (set.labs || []).reduce(function (n, l) { return n + l.steps.length; }, 0); }
 
   // How ready the person is, from what they have done in each part that exists in this lab.
   // -> { pct, parts: [{ key, text, frac }] }
   function readiness(set, p) {
     var parts = [];
     if (set.notes) parts.push({ key: "notes", text: "Notes " + Math.min(count(p.notes), set.notes.length) + "/" + set.notes.length, frac: Math.min(count(p.notes), set.notes.length) / set.notes.length });
+    if (set.labs) { var ls = labStepsTotal(set); parts.push({ key: "labs", text: "Lab steps " + Math.min(count(p.labs), ls) + "/" + ls, frac: Math.min(count(p.labs), ls) / ls }); }
     if (set.quiz) parts.push({ key: "quiz", text: p.best ? "Quiz best " + p.best.pct + "%" : "Quiz best —", frac: p.best ? p.best.pct / 100 : 0 });
     if (set.flashcards) parts.push({ key: "flashcards", text: "Cards " + Math.min(count(p.known), set.flashcards.length) + "/" + set.flashcards.length + " known", frac: Math.min(count(p.known), set.flashcards.length) / set.flashcards.length });
     if (set.checklist) { var t = checklistTotal(set); parts.push({ key: "checklist", text: "Checklist " + Math.min(count(p.check), t) + "/" + t, frac: Math.min(count(p.check), t) / t }); }
@@ -200,11 +216,14 @@
 
   function verdict(pct) { return pct >= 85 ? "ready on this set" : pct >= 70 ? "close: review the misses" : "keep studying the notes"; }
 
-  // A module's unit pages in the order to read them: the teaching units first, the short introduction last.
+  // A module's unit pages in the order to read them: the hands-on exercises first (they hold step-by-step
+  // instructions), then the teaching units, the short introduction last.
   function unitOrder(units) {
     var list = (Array.isArray(units) ? units : []).filter(function (u) { return typeof u === "string"; });
     var intro = list.filter(function (u) { return /\/1-introduction\/$/.test(u); });
-    return list.filter(function (u) { return intro.indexOf(u) === -1; }).concat(intro);
+    var rest = list.filter(function (u) { return intro.indexOf(u) === -1; });
+    var ex = rest.filter(function (u) { return /\/\d+-exercise/.test(u); });
+    return ex.concat(rest.filter(function (u) { return ex.indexOf(u) === -1; })).concat(intro);
   }
 
   // The unit pages to read across all the modules of a course: the first page of every module, then the
@@ -222,8 +241,28 @@
     return out;
   }
 
+  // What to ask the Worker for, in the order to ask: the smallest part first and alone (so the source is
+  // cached for the rest), the notes last, in three passes. -> [{ key, kind, part }]
+  function writeTasks(kinds) {
+    var out = [];
+    ["traps", "checklist", "flashcards", "labs", "quiz", "notes"].forEach(function (k) {
+      if (kinds.indexOf(k) === -1) return;
+      if (k === "notes") for (var i = 1; i <= NOTES_PARTS; i++) out.push({ key: "notes:" + i, kind: "notes", part: i });
+      else out.push({ key: k, kind: k, part: 1 });
+    });
+    return out;
+  }
+
+  // Which passes of the notes a lab does not have (all three when it has no notes).
+  function missingNoteParts(set) {
+    var have = set.notes ? (set.noteParts || []) : [];
+    var out = [];
+    for (var i = 1; i <= NOTES_PARTS; i++) if (have.indexOf(i) === -1) out.push(i);
+    return out;
+  }
+
   // Which parts a lab does not have yet, in the order they are shown.
-  function missingKinds(set) { return KIND_ORDER.filter(function (k) { return !set[k]; }); }
+  function missingKinds(set) { return KIND_ORDER.filter(function (k) { return k !== "notes" && !set[k]; }); }
 
   // The whole lab as Markdown, for the notebook. Only the parts that were made are included.
   function toMarkdown(set) {
@@ -232,6 +271,18 @@
     if (set.notes) {
       out.push("## Notes", "");
       set.notes.forEach(function (s) { out.push("### " + s.heading, ""); s.items.forEach(function (i) { out.push("- " + i); }); out.push(""); });
+    }
+    if (set.labs) {
+      out.push("## Hands-on labs", "");
+      set.labs.forEach(function (l) {
+        out.push("### " + l.title + (l.minutes ? " (about " + l.minutes + " minutes)" : ""), "");
+        if (l.objective) out.push(l.objective, "");
+        if (l.needs.length) { out.push("**You need:**", ""); l.needs.forEach(function (x) { out.push("- " + x); }); out.push(""); }
+        l.steps.forEach(function (st, i) { out.push((i + 1) + ". " + st.text + (st.check ? " *(You should see: " + st.check + ")*" : "")); });
+        out.push("");
+        if (l.cleanup) out.push("**Clean up:** " + l.cleanup, "");
+        if (l.exam) out.push("**Why it matters for the exam:** " + l.exam, "");
+      });
     }
     if (set.flashcards) {
       out.push("## Flashcards", "");
@@ -275,7 +326,7 @@
 
   var helpers = {
     normalizeLink: normalizeLink, errorText: errorText, letter: letter, cleanSet: cleanSet, cleanProgress: cleanProgress, emptyProgress: emptyProgress,
-    readiness: readiness, tabsFor: tabsFor, interleaveUnits: interleaveUnits, unitOrder: unitOrder, missingKinds: missingKinds, reasonText: reasonText, FATAL_REASONS: FATAL_REASONS, shuffled: shuffled, cardList: cardList, quizOutcome: quizOutcome, verdict: verdict,
+    readiness: readiness, tabsFor: tabsFor, interleaveUnits: interleaveUnits, unitOrder: unitOrder, missingKinds: missingKinds, writeTasks: writeTasks, missingNoteParts: missingNoteParts, labStepsTotal: labStepsTotal, reasonText: reasonText, FATAL_REASONS: FATAL_REASONS, shuffled: shuffled, cardList: cardList, quizOutcome: quizOutcome, verdict: verdict,
     toMarkdown: toMarkdown, sourceLine: sourceLine, scoreText: scoreText, checklistTotal: checklistTotal, TABS: TABS
   };
   if (typeof document === "undefined") {
@@ -461,7 +512,7 @@
     var panel = el("section", "lab-view");
     panel.setAttribute("role", "tabpanel");
     v.appendChild(panel);
-    ({ overview: viewOverview, notes: viewNotes, quiz: viewQuiz, flashcards: viewCards, traps: viewTraps, checklist: viewChecklist })[lab.tab](panel);
+    ({ overview: viewOverview, notes: viewNotes, labs: viewLabs, quiz: viewQuiz, flashcards: viewCards, traps: viewTraps, checklist: viewChecklist })[lab.tab](panel);
   }
 
   // -- overview
@@ -483,14 +534,21 @@
       });
       p.appendChild(grid);
     }
-    var missing = missingKinds(set);
-    if (missing.length && lab.persisted) {
+    var missing = missingKinds(set), notesMissing = missingNoteParts(set);
+    if ((missing.length || notesMissing.length) && lab.persisted) {
       var gap = el("div", "sl-panel");
       gap.appendChild(el("h3", null, "Not made yet"));
       gap.appendChild(el("p", "gen-note", "These parts aren’t in this lab. Each one is written from the pages already read."));
       var row = el("div", "sl-row");
+      if (notesMissing.length === NOTES_PARTS) {
+        var nb = btn("Notes"); nb.addEventListener("click", function () { retryKind("notes", nb, notesMissing); });
+        row.appendChild(nb);
+      } else notesMissing.forEach(function (n) {
+        var pb = btn("Notes (pass " + n + " of " + NOTES_PARTS + ")"); pb.addEventListener("click", function () { retryKind("notes", pb, [n]); });
+        row.appendChild(pb);
+      });
       missing.forEach(function (k) {
-        var b = btn(kindLabel(k)); b.addEventListener("click", function () { retryKind(k, b); });
+        var b = btn(kindLabel(k)); b.addEventListener("click", function () { retryKind(k, b, [1]); });
         row.appendChild(b);
       });
       gap.appendChild(row);
@@ -500,12 +558,13 @@
     panel.appendChild(el("h3", null, "In this lab"));
     var ul = el("ul", "sl-facts");
     if (set.notes) ul.appendChild(el("li", null, set.notes.length + " note topics to read and tick off"));
+    if (set.labs) ul.appendChild(el("li", null, set.labs.length + " hands-on labs with step-by-step instructions (" + labStepsTotal(set) + " steps)"));
     if (set.quiz) ul.appendChild(el("li", null, set.quiz.length + " practice questions, shuffled each run"));
     if (set.flashcards) ul.appendChild(el("li", null, set.flashcards.length + " flashcards"));
     if (set.traps) ul.appendChild(el("li", null, set.traps.length + " common traps"));
     if (set.checklist) ul.appendChild(el("li", null, checklistTotal(set) + " things to be able to explain or do"));
     panel.appendChild(ul);
-    panel.appendChild(el("p", "gen-note", "Readiness counts topics studied, your best quiz score, cards marked known and checklist items ticked. Your progress is saved to your account, so it is here next time and on any device."));
+    panel.appendChild(el("p", "gen-note", "Readiness counts topics studied, lab steps done, your best quiz score, cards marked known and checklist items ticked. Your progress is saved to your account, so it is here next time and on any device."));
     if (set.url) {
       var a = el("a", null, "Open the source page");
       a.href = set.url; a.target = "_blank"; a.rel = "noopener noreferrer";
@@ -515,7 +574,7 @@
     p.appendChild(panel);
   }
 
-  function kindLabel(k) { return { notes: "Notes", quiz: "Quiz", flashcards: "Flashcards", traps: "Traps", checklist: "Checklist" }[k] || k; }
+  function kindLabel(k) { return { notes: "Notes", labs: "Hands-on labs", quiz: "Quiz", flashcards: "Flashcards", traps: "Traps", checklist: "Checklist" }[k] || k; }
 
   // -- notes
 
@@ -685,6 +744,59 @@
     p.appendChild(nav);
   }
 
+  // -- hands-on labs
+
+  function viewLabs(p) {
+    var set = lab.set;
+    var head = el("div");
+    head.appendChild(el("h2", null, "Hands-on labs"));
+    head.appendChild(el("p", "gen-note", "Do these in a test tenant, not a live one. Tick each step as you do it. Menu names and settings change: where a step doesn’t match what you see, trust the portal and the source page."));
+    p.appendChild(head);
+    set.labs.forEach(function (l, li) {
+      var done = l.steps.filter(function (_, si) { return lab.progress.labs[li + ":" + si]; }).length;
+      var d = el("details", "sl-detail");
+      d.id = "sl-lab-" + li;
+      var sum = el("summary");
+      var left = el("span", "sl-sum");
+      left.appendChild(el("span", "sl-arrow", "›"));
+      left.appendChild(el("h3", null, l.title));
+      sum.appendChild(left);
+      sum.appendChild(el("span", "gen-note", (l.minutes ? "about " + l.minutes + " min · " : "") + done + "/" + l.steps.length + " steps"));
+      d.appendChild(sum);
+      var body = el("div", "sl-body");
+      if (l.objective) body.appendChild(el("p", null, l.objective));
+      if (l.needs.length) {
+        body.appendChild(el("p", "sl-strong", "You need"));
+        var nl = el("ul", "sl-facts"); l.needs.forEach(function (x) { nl.appendChild(el("li", null, x)); }); body.appendChild(nl);
+      }
+      body.appendChild(el("p", "sl-strong", "Steps"));
+      var steps = el("ol", "sl-steps");
+      l.steps.forEach(function (st, si) {
+        var li2 = el("li");
+        var label = el("label", "sl-step");
+        var cb = el("input"); cb.type = "checkbox"; cb.checked = !!lab.progress.labs[li + ":" + si];
+        cb.addEventListener("change", function () {
+          if (cb.checked) lab.progress.labs[li + ":" + si] = true; else delete lab.progress.labs[li + ":" + si];
+          saveProgress(); updateGauge();
+          var n = l.steps.filter(function (_, k) { return lab.progress.labs[li + ":" + k]; }).length;
+          sum.lastChild.textContent = (l.minutes ? "about " + l.minutes + " min · " : "") + n + "/" + l.steps.length + " steps";
+        });
+        label.appendChild(cb);
+        var t = el("span");
+        t.appendChild(el("span", null, st.text));
+        if (st.check) t.appendChild(el("span", "sl-check", "You should see: " + st.check));
+        label.appendChild(t);
+        li2.appendChild(label);
+        steps.appendChild(li2);
+      });
+      body.appendChild(steps);
+      if (l.cleanup) { body.appendChild(el("p", "sl-strong", "Clean up")); body.appendChild(el("p", null, l.cleanup)); }
+      if (l.exam) body.appendChild(el("p", "gen-note", "Why it matters for the exam: " + l.exam));
+      d.appendChild(body);
+      p.appendChild(d);
+    });
+  }
+
   // -- traps
 
   function viewTraps(p) {
@@ -774,24 +886,28 @@
   }
 
   // Ask for one part; the answer arrives as JSON after a few spaces of keep-alive. -> { ok, kind, value } or { ok: false, error }
-  function makePart(id, kind) {
-    return call("POST", "/study/make", { id: id, kind: kind }, MAKE_TIMEOUT_MS).then(function (r) {
+  function makePart(id, kind, part) {
+    var body = { id: id, kind: kind };
+    if (kind === "notes") body.part = part || 1;
+    return call("POST", "/study/make", body, MAKE_TIMEOUT_MS).then(function (r) {
       if (r.status === 200 && r.json && r.json.ok === true) return r.json;
       return { ok: false, error: (r.json && r.json.error) || "generation_failed", reason: r.json && r.json.reason, status: r.status, kind: kind };
     });
   }
 
-  // Add a missing part to the lab that is open, then open the saved lab again.
-  function retryKind(kind, button) {
+  // Add a missing part (or some passes of the notes) to the lab that is open, then open the saved lab again.
+  function retryKind(kind, button, parts) {
     if (!lab || !lab.persisted) return;
-    var id = lab.set.id;
+    var id = lab.set.id, label = button.textContent;
     button.disabled = true;
-    button.textContent = "Writing " + kindLabel(kind).toLowerCase() + "…";
-    makePart(id, kind).then(function (res) {
-      if (res.ok) { toast(kindLabel(kind) + " added."); openLab(id); return; }
+    button.textContent = "Writing…";
+    Promise.all(parts.map(function (n) { return makePart(id, kind, n); })).then(function (all) {
+      var bad = all.filter(function (r) { return !r.ok; });
+      if (!bad.length) { toast(label + " added."); openLab(id); return; }
+      if (bad.length < all.length) { toast("Some of " + label + " was added; " + (bad[0].reason ? reasonText(bad[0].reason) : "the rest failed.")); openLab(id); return; }
       button.disabled = false;
-      button.textContent = kindLabel(kind);
-      toast(res.reason ? reasonText(res.reason) : errorText(res.error, res.status || 0).text);
+      button.textContent = label;
+      toast(bad[0].reason ? reasonText(bad[0].reason) : errorText(bad[0].error, bad[0].status || 0).text);
     });
   }
 
@@ -850,26 +966,33 @@
         say("Reading page " + done + " of " + total + (total > 1 ? " (more are found as modules are read)" : "") + "…");
       }).then(function (rd) {
         if (rd.fatal) { stop(rd.fatal); return; }
-        var wrote = [], bad = [], firstBad = null, kept = false;
-        function status() { say("Writing: " + kinds.map(function (k) { return kindLabel(k) + (wrote.indexOf(k) > -1 ? " ✓" : bad.indexOf(k) > -1 ? " ✗" : " …"); }).join(" · ") + ". This can take a few minutes."); }
-        function run(k) {
-          return makePart(id, k).then(function (res) {
-            if (res.ok) { wrote.push(k); if (res.saved === true) kept = true; } else { bad.push(k); firstBad = firstBad || res; }
+        var tasks = writeTasks(kinds), wrote = [], bad = [], firstBad = null, kept = false;
+        function taskLabel(t) { return kindLabel(t.kind) + (t.kind === "notes" ? " " + t.part + "/" + NOTES_PARTS : ""); }
+        function status() { say("Writing: " + tasks.map(function (t) { return taskLabel(t) + (wrote.indexOf(t.key) > -1 ? " ✓" : bad.indexOf(t.key) > -1 ? " ✗" : " …"); }).join(" · ") + ". This takes a few minutes."); }
+        function run(t) {
+          return makePart(id, t.kind, t.part).then(function (res) {
+            if (res.ok) { wrote.push(t.key); if (res.saved === true) kept = true; } else { bad.push(t.key); firstBad = firstBad || res; }
             status();
             return res;
           });
         }
+        // At most three parts are written at once, so the account's per-minute limits are not hit all together.
+        function pool(items, at) {
+          var next = 0;
+          function worker() { if (next >= items.length) return Promise.resolve(); var t = items[next++]; return run(t).then(worker); }
+          var ws = []; for (var i = 0; i < at; i++) ws.push(worker());
+          return Promise.all(ws);
+        }
         status();
-        // The smallest part goes first, alone: the pages are then cached on Claude's side, and the other four
-        // (sent together) read them from the cache instead of each counting against the account's limit.
-        var order = ["traps", "checklist", "flashcards", "quiz", "notes"].filter(function (k) { return kinds.indexOf(k) > -1; });
-        return run(order[0]).then(function (first) {
+        // The smallest part goes first, alone: the pages are then cached on Claude's side, and the rest read them
+        // from the cache instead of each counting against the account's limit.
+        return run(tasks[0]).then(function (first) {
           if (!first.ok && (FATAL_REASONS[first.reason] || first.error === "source_too_thin" || first.error === "source_expired")) {
             go.disabled = false; say("");
             showGate(first.reason ? reasonText(first.reason) : errorText(first.error, first.status || 0).text, false);
             return null;
           }
-          return Promise.all(order.slice(1).map(run)).then(function () { return true; });
+          return pool(tasks.slice(1), 3).then(function () { return true; });
         }).then(function (went) {
           if (!went) return;
           if (!wrote.length) { go.disabled = false; say(""); showGate(firstBad && firstBad.reason ? reasonText(firstBad.reason) : ERRORS.generation_failed, false); return; }
@@ -880,7 +1003,7 @@
             say("");
             if (!set) { showGate(ERRORS.generation_failed, false); return; }
             startLab(set, cleanProgress(r.json.progress), true);
-            if (bad.length) toast("Couldn’t write: " + bad.map(kindLabel).join(", ") + ". " + (firstBad && firstBad.reason ? reasonText(firstBad.reason) + " " : "") + "Add them from the Overview.");
+            if (bad.length) toast("Couldn’t write: " + bad.map(function (k) { var i = k.split(":"); return kindLabel(i[0]) + (i[1] ? " pass " + i[1] : ""); }).join(", ") + ". " + (firstBad && firstBad.reason ? reasonText(firstBad.reason) + " " : "") + "Add them from the Overview.");
           });
         });
       });
