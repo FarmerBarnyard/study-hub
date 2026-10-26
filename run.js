@@ -113,7 +113,51 @@
   }
   var FATAL = { not_found: 1, run_revoked: 1, run_expired: 1 };
 
+  // ---- sending an email (the owner only; the Worker: /kb/run/send) ----
+
+  // How many addresses are in the box (split on commas, semicolons and line breaks, without repeats).
+  function countAddresses(text) {
+    var seen = {}, n = 0;
+    String(text || "").split(/[,;\n]+/).forEach(function (p) {
+      p = p.trim().toLowerCase();
+      if (p && !seen[p]) { seen[p] = 1; n++; }
+    });
+    return n;
+  }
+
+  var SEND_FAILED = {
+    forbidden: "Microsoft refused to send from that mailbox. Ask your admin to check the app's access to it.",
+    auth: "Microsoft rejected the app's sign-in. The app's secret may have expired.",
+    throttled: "Microsoft is limiting sends right now. Wait a few minutes and try again.",
+    bad_request: "Microsoft didn't accept that email. Check the addresses.",
+    unavailable: "Microsoft isn't answering. Try again in a moment.",
+    not_configured: "Sending isn't set up yet.",
+  };
+  var SEND_ERRORS = {
+    recent_sign_in_required: "For safety, sending needs a recent sign-in. Sign in to the study site again, then reload this page.",
+    details_missing: "Fill in the details above first",
+    no_recipients: "Add at least one address to send to.",
+    recipient_invalid: "One of the addresses isn't valid.",
+    too_many_recipients: "That's more than 25 addresses. Split it into two sends.",
+    send_limit: "Today's sending allowance is used up.",
+    already_sent: "This email was already sent.",
+    send_not_configured: "Sending isn't set up yet.",
+    run_revoked: "This link has been switched off.",
+    run_expired: "This link has expired.",
+    forbidden: "Only the owner can send from here.",
+    unauthenticated: "You are signed out. Sign in to the study site again, then reload this page.",
+  };
+  function sendErrorText(code, json, status) {
+    json = json || {};
+    if (code === "details_missing" && json.details && json.details.length) return "Fill in these details first: " + json.details.join(", ") + ".";
+    if (code === "send_failed") return SEND_FAILED[json.reason] || "The email couldn't be sent. Try again in a moment.";
+    if (SEND_ERRORS[code]) return SEND_ERRORS[code];
+    if (status === 0) return "Couldn't reach the server. Check your connection.";
+    return "The email couldn't be sent. Try again in a moment.";
+  }
+
   var api = {
+    countAddresses: countAddresses, sendErrorText: sendErrorText,
     tokenFromHash: tokenFromHash, fieldsOf: fieldsOf, fillTemplate: fillTemplate, missingFor: missingFor, mailtoUrl: mailtoUrl,
     stepsOf: stepsOf, progress: progress, expiryText: expiryText, errorText: errorText, clock: clock, FATAL: FATAL,
   };
@@ -270,6 +314,76 @@
     view.open = el("a", "btn run-mail-open", tools, "Open in email app");
     view.open.rel = "noopener";
     mailViews.push(view);
+    buildSend(view, card);
+  }
+
+  // The owner's Send panel under an email. Hidden for everyone else: it only appears once the Worker says this
+  // browser is signed in as the owner and the shared mailbox is set up (checkSend).
+  function buildSend(view, card) {
+    var box = el("div", "run-send", card);
+    box.hidden = true;
+    var row = el("label", "run-send-to", box);
+    el("span", "", row, "Send to");
+    var to = el("input", "", row);
+    to.type = "text"; to.maxLength = 1000; to.autocomplete = "off"; to.placeholder = "name@example.org, other@example.org";
+    var acts = el("div", "run-send-acts", box);
+    var go = btn("Send", "btn run-send-go", acts, null);
+    var sure = el("span", "run-send-sure", acts);
+    sure.hidden = true;
+    var sureText = el("span", "", sure);
+    var yes = btn("Send now", "btn run-send-yes", sure, null);
+    var no = btn("Cancel", "btn", sure, function () { sure.hidden = true; go.hidden = false; });
+    var status = el("p", "run-send-status", box);
+    view.send = { box: box, to: to, go: go, status: status, edited: false, sending: false };
+    to.addEventListener("input", function () { view.send.edited = true; });
+    go.addEventListener("click", function () {
+      var miss = missingFor({ t: "email", to: "", subject: view.email.subject, body: view.email.body }, liveFields());
+      if (miss.length) { status.textContent = sendErrorText("details_missing", { details: miss }); status.className = "run-send-status run-bad"; return; }
+      var n = countAddresses(to.value);
+      if (!n) { status.textContent = sendErrorText("no_recipients"); status.className = "run-send-status run-bad"; return; }
+      var again = !!(run.sent && run.sent[view.email.id]);
+      sureText.textContent = (again ? "This was already sent. Send it again to " : "Send to ") + n + (n === 1 ? " address" : " addresses") + " from " + sendInfo.from + "? ";
+      sure.hidden = false; go.hidden = true;
+      yes.onclick = function () { sure.hidden = true; go.hidden = false; doSend(view, again); };
+    });
+  }
+
+  var sendInfo = null;     // { from } once the Worker says this browser may send
+
+  function checkSend() {
+    return fetch("https://api.barnyard.site/kb/run/send-status", { credentials: "include", cache: "no-store", referrerPolicy: "no-referrer" }).then(function (r) {
+      if (r.status !== 200) return null;
+      return r.json().catch(function () { return null; });
+    }, function () { return null; }).then(function (j) {
+      if (!j || !j.canSend) return;
+      sendInfo = { from: j.from };
+      mailViews.forEach(function (v) { if (v.send) v.send.box.hidden = false; });
+      paintMail();
+    });
+  }
+
+  function doSend(view, again) {
+    var s = view.send;
+    s.go.disabled = true;
+    s.status.textContent = "Sending…"; s.status.className = "run-send-status";
+    fetch("https://api.barnyard.site/kb/run/send", {
+      method: "POST", credentials: "include", cache: "no-store", referrerPolicy: "no-referrer",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: token, email: view.email.id, to: s.to.value, confirmResend: again }),
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { return { status: r.status, json: j || {} }; });
+    }, function () { return { status: 0, json: {} }; }).then(function (r) {
+      s.go.disabled = false;
+      if (r.status === 200 && r.json.ok) {
+        run.sent = r.json.sent || run.sent;
+        s.edited = false;
+        paintMail();
+        say("Email sent");
+      } else {
+        s.status.textContent = sendErrorText(r.json.error, r.json, r.status);
+        s.status.className = "run-send-status run-bad";
+      }
+    });
   }
 
   function buildFields() {
@@ -313,6 +427,14 @@
       v.hint.textContent = miss.length ? "Still to fill in above: " + miss.join(", ") + "." : "";
       var href = mailtoUrl(v.email, f);
       if (href) { v.open.href = href; v.open.hidden = false; } else { v.open.removeAttribute("href"); v.open.hidden = true; }
+      if (v.send && sendInfo) {
+        var s = v.send;
+        if (!s.edited && document.activeElement !== s.to) { var filled = fillTemplate(v.email.to, f); s.to.value = /\{\{/.test(filled) ? "" : filled; }
+        var was = run.sent && run.sent[v.email.id];
+        s.go.textContent = was ? "Send again from " + sendInfo.from : "Send from " + sendInfo.from;
+        if (was) { s.status.textContent = "Sent " + clock(was.at) + " to " + was.n + (was.n === 1 ? " address" : " addresses") + (was.by ? " by " + was.by : "") + "."; s.status.className = "run-send-status run-ok"; }
+        else if (s.status.className.indexOf("run-ok") !== -1) { s.status.textContent = ""; s.status.className = "run-send-status"; }
+      }
     });
   }
 
@@ -395,6 +517,7 @@
       buildFields();
       $("run").hidden = false;
       paint();
+      checkSend();
       loadName();
       $("run-name").addEventListener("change", saveName);
       $("run-print").addEventListener("click", function () { root.print(); });
