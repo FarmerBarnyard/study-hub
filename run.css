@@ -1,0 +1,95 @@
+/* A run link's page (run.html). Colours come from the shell's theme tokens (--panel, --line, --fg ...), so every
+   theme and light/dark works. No inline styles (the page CSP forbids them). Built to be used on a phone beside
+   a keyboard and to print as a paper checklist. */
+
+.run-page { margin: 0; min-height: 100vh; background: var(--bg); color: var(--fg); }
+.run-main { max-width: 860px; margin: 0 auto; padding: 28px 16px 80px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.run[hidden], .run-gate[hidden] { display: none; }
+
+.run .btn, .run-main .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg-strong); cursor: pointer; font-size: 13px; font-weight: 500; text-decoration: none; font-family: inherit; }
+.run .btn:hover { background: var(--panel-2); }
+.run :focus-visible, .run-main :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.run-gate { padding: 40px 0; max-width: 56ch; }
+.run-gate h1 { margin: 0 0 8px; font-family: var(--font-display); color: var(--fg-strong); }
+
+/* ---- the top of the page */
+.run-head { display: flex; flex-direction: column; gap: 8px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.run-kicker { margin: 0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.run-head h1 { margin: 0; font-family: var(--font-display); font-size: clamp(1.5rem, 4vw, 2.1rem); line-height: 1.2; color: var(--fg-strong); text-wrap: balance; }
+.run-label { margin: 0; font-size: 1.05rem; color: var(--fg-strong); }
+.run-dim { margin: 0; color: var(--fg-dim); font-size: 13px; }
+.run-share { max-width: 70ch; }
+.run-progress { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.run-progress progress { flex: 1; height: 10px; accent-color: var(--accent); }
+#run-count { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; color: var(--fg-strong); }
+.run-complete { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--accent-soft); color: var(--fg-strong); border: 1px solid var(--accent); font-weight: 600; }
+.run-who-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; justify-content: space-between; margin-top: 4px; }
+.run-name { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--fg-dim); flex: 1; min-width: 220px; max-width: 360px; }
+.run input[type="text"] { min-height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: inherit; width: 100%; box-sizing: border-box; }
+.run-msg { position: sticky; top: 8px; z-index: 5; margin: 12px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); color: var(--fg-strong); }
+.run-msg[hidden] { display: none; }
+.run-msg.run-bad { border-color: var(--alert); color: var(--alert); background: var(--alert-soft); }
+
+/* ---- the details the emails use */
+.run-fields-wrap { margin-top: 22px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.run-fields-wrap[hidden] { display: none; }
+.run-fields-wrap .run-h { margin-top: 0; }
+.run-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px 14px; margin-top: 10px; }
+.run-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--fg-dim); }
+
+/* ---- headings, context and steps */
+.run-body { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.run-h { font-family: var(--font-display); color: var(--fg-strong); line-height: 1.25; margin: 1.8em 0 .4em; text-wrap: balance; }
+h2.run-h { font-size: 1.35rem; padding-top: 14px; border-top: 1px solid var(--line); }
+h3.run-h { font-size: 1.1rem; }
+.run-context { color: var(--fg); max-width: 78ch; }
+
+.run-step { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); margin: 3px 0; }
+.run-step.run-d1 { margin-left: 22px; }
+.run-step.run-d2 { margin-left: 44px; }
+.run-step.run-done { background: var(--panel-2); }
+.run-step.run-done .run-step-text { color: var(--fg-dim); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--fg-dim) 50%, transparent); }
+.run-check { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
+.run-check input { width: 22px; height: 22px; margin: 2px 0 0; flex: none; accent-color: var(--accent); cursor: pointer; }
+.run-step-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.run-step-text p { margin: 0; }
+.run-step-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin: 4px 0 0 34px; font-size: 12.5px; color: var(--fg-dim); }
+.run-step-meta:empty { display: none; }
+.run-link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 12.5px; text-decoration: underline; }
+.run-note { color: var(--fg); }
+.run-note-row { margin: 6px 0 0 34px; }
+.run-note-row[hidden] { display: none; }
+.run-detail { margin: 8px 0 0 34px; }
+.run-detail summary { cursor: pointer; font-size: 12.5px; color: var(--fg-dim); }
+.run-detail .md { margin-top: 4px; }
+
+/* ---- email templates */
+.run-mail { margin: 14px 0; padding: 14px 16px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--panel); }
+.run-mail-name { margin: 0 0 8px; font-family: var(--font-display); color: var(--fg-strong); font-size: 1.05rem; }
+.run-mail-head { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0 0 8px; font-size: 13.5px; }
+.run-mail-head dt { color: var(--fg-dim); }
+.run-mail-head dd { margin: 0; color: var(--fg-strong); overflow-wrap: anywhere; }
+.run-mail-body { margin: 0; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); white-space: pre-wrap; overflow-wrap: anywhere; font: 13.5px/1.55 var(--font-body); color: var(--fg); }
+.run-mail-hint { margin: 8px 0 0; font-size: 12.5px; color: var(--attn); }
+.run-mail-hint:empty { display: none; }
+.run-mail-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.run-mail-open[hidden] { display: none; }
+
+@media (max-width: 560px) {
+  .run-step.run-d1 { margin-left: 12px; }
+  .run-step.run-d2 { margin-left: 24px; }
+  .run-step-meta, .run-note-row, .run-detail { margin-left: 0; }
+}
+@media print {
+  .run-page { background: #fff; color: #000; }
+  .run-who-row .btn, .run-note-row, .run-link, .run-mail-tools, .run-msg { display: none; }
+  .run-step, .run-mail, .run-fields-wrap { break-inside: avoid; border-color: #999; background: #fff; }
+  .run-step.run-done .run-step-text { text-decoration: none; }
+}
+
+/* wide tables scroll sideways inside their own box instead of squeezing their columns */
+.run .md .table-wrap { overflow-x: auto; max-width: 100%; }
+.run .md table { width: max-content; min-width: 0; }
+.run .md th, .run .md td { min-width: 70px; }

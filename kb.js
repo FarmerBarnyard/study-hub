@@ -160,6 +160,19 @@
     ai_unavailable: "The AI model is not reachable right now. You can write the summary yourself.",
     ai_bad_reply: "The AI model answered in an unexpected way. Try again, or write the summary yourself.",
     forbidden: "You do not have access to do that.",
+    not_an_sop: "Run links are only for procedures: file the article under Runbooks & procedures, tag it \"sop\", or start its title with \"SOP:\".",
+    no_steps: "This article has no steps to tick off. Write the steps as a numbered list (1. 2. 3.) or as \"- [ ]\" items.",
+    pii_in_article: "This article contains personal details that would be public on the run page. Tick the box to confirm that is fine.",
+    article_hidden: "This article is hidden. Show it again before making a run link.",
+    article_runs_full: "This procedure already has 20 live run links. Turn one off first.",
+    author_runs_full: "You already have 60 live run links. Turn some off first.",
+    runs_full: "The site is at its limit of run links. Turn some off first.",
+    too_many_steps: "A run can have up to 400 steps.",
+    step_too_long: "One of the steps is too long for a run (1,200 characters at most).",
+    too_many_emails: "A procedure can have up to 12 email templates.",
+    email_too_long: "An email template is too long (5,000 characters at most).",
+    too_many_fields: "The email templates use too many different {{details}} (24 at most).",
+    context_too_long: "A stretch of text between steps is too long for a run page. Break it up with a heading.",
   };
   function describeError(status, json) {
     var j = json || {};
@@ -282,7 +295,37 @@
     return what + title + " started " + ago + ". It carries on without this page.";
   }
 
+  // ---- run links (a public checklist made from an SOP; the Worker: /kb/run, the page: run.html) ----------------
+
+  // A procedure: filed under Runbooks & procedures, tagged "sop", or titled "SOP: ...". (The Worker decides again.)
+  function isSop(a) {
+    if (!a) return false;
+    var tags = a.tags || [];
+    if (tags.some(function (t) { return String(t).toLowerCase() === "sop"; })) return true;
+    if (/^\s*sop\b/i.test(String(a.title || ""))) return true;
+    return categoryOf(a) === "runbooks";
+  }
+
+  function runLinkUrl(origin, token) { return String(origin || "").replace(/\/+$/, "") + "/run.html#" + token; }
+
+  // "Live · 3 of 10 steps · works for 6 more days" / "Switched off" / "Expired".
+  function runLine(run, now) {
+    var n = Number.isFinite(now) ? now : Date.now();
+    var progress = run.done + " of " + run.steps + " steps";
+    if (run.status === "revoked") return "Switched off · " + progress;
+    if (run.status === "expired") return "Expired · " + progress;
+    var when = "does not expire";
+    if (run.expiresAt) {
+      var hours = Math.max(1, Math.ceil((run.expiresAt - n) / 3600000));
+      when = hours < 48 ? "works for " + hours + " more hour" + (hours === 1 ? "" : "s") : "works for " + Math.ceil(hours / 24) + " more days";
+    }
+    return (run.completedAt ? "Complete" : "Live") + " · " + progress + " · " + when;
+  }
+
+  var EMAIL_TEMPLATE = "```email\nName: Notice to staff, one week before\nTo: all-staff@{{domain}}\nSubject: What is changing on {{date}}\n\nHi all,\n\nA short explanation of what is happening on {{date}} and what people need to do.\n\nQuestions? Contact {{contact}}.\n\nThanks,\n{{your name}}\n```\n";
+
   var api = {
+    isSop: isSop, runLinkUrl: runLinkUrl, runLine: runLine, EMAIL_TEMPLATE: EMAIL_TEMPLATE,
     readMemo: readMemo, memoLine: memoLine, MEMO_MAX_AGE_MS: MEMO_MAX_AGE_MS,
     parseRoute: parseRoute, relTime: relTime, tagCounts: tagCounts, filterItems: filterItems, sortItems: sortItems,
     categoryOf: categoryOf, categoryCounts: categoryCounts, countText: countText,
@@ -773,6 +816,9 @@
       var edit = el("a", "btn", tools, "Edit");
       edit.href = "#/edit/" + a.id;
     }
+    if ((data.canEdit || data.canModerate) && isSop(a) && !a.hidden) {
+      btn("Run links", "btn kb-primary", tools, function () { openRunLinks(a); });
+    }
     if (data.canEdit || data.canModerate) {
       btn(a.hidden ? "Show again" : "Hide", "btn", tools, function () { setHidden(a, !a.hidden); });
       btn("Delete", "btn kb-danger", tools, function () { confirmDelete(a); });
@@ -846,6 +892,94 @@
       toast(hidden ? "Hidden from everyone else" : "Visible to everyone again");
       openArticle(a.id);
     });
+  }
+
+  // The run links of one procedure: make one, copy or open one, switch one off. A link is public by design (anyone who
+  // holds it sees the steps and can tick them), so making one asks for that to be understood, and personal data in the
+  // article needs a second tick.
+  function openRunLinks(a) {
+    var dlg = openDialog("Run links: " + a.title, function (body) {
+      el("p", "", body, "A run link is a public checklist made from this procedure's steps. Anyone who has the link can see the steps and tick them off, and everyone sees the same ticks. The steps are copied when you make the link, so editing this article later doesn't change a run in progress. Switch a link off at any time.");
+      var made = el("div", "kb-run-made", body);
+      made.hidden = true;
+
+      var form = el("div", "kb-run-form", body);
+      var l1 = el("label", "kb-run-field", form);
+      el("span", "", l1, "Name this run (optional)");
+      var label = el("input", "kb-input", l1); label.type = "text"; label.maxLength = 80; label.placeholder = "e.g. Cutover, 8 November";
+      var l2 = el("label", "kb-run-field", form);
+      el("span", "", l2, "The link works for");
+      var days = el("select", "kb-input", l2);
+      [["7", "7 days"], ["1", "1 day"], ["30", "30 days"], ["0", "Until I switch it off"]].forEach(function (o) { var op = el("option", "", days, o[1]); op.value = o[0]; });
+      var pii = null;
+      if (a.pii && a.pii.length) {
+        var lp = el("label", "kb-run-check", form);
+        pii = el("input", "", lp); pii.type = "checkbox";
+        el("span", "", lp, "This article contains " + describePii(a.pii) + ". I've checked it's fine for that to be public on the run page.");
+      }
+      var lc = el("label", "kb-run-check", form);
+      var sure = el("input", "", lc); sure.type = "checkbox";
+      el("span", "", lc, "I understand anyone with the link can see this procedure and tick its steps.");
+      var go = btn("Make run link", "btn kb-primary", form, null);
+      var msg = el("p", "kb-error", form); msg.hidden = true;
+
+      var listHead = el("h3", "", body, "Existing run links");
+      var list = el("div", "kb-run-list", body);
+      var help = el("details", "kb-run-help", body);
+      el("summary", "", help, "Email templates for this procedure");
+      el("p", "", help, "Add emails to the article itself and they appear on every run link, filled in from a few details typed once. Put each in a block like this (the editor has an \"Insert email template\" button):");
+      el("pre", "kb-run-example", help, EMAIL_TEMPLATE.replace(/\n$/, ""));
+      el("p", "", help, "{{double braces}} mark a detail to fill in once for the whole run. People can copy the subject or body, or open the email in their mail app.");
+
+      function show(text) { msg.textContent = text; msg.hidden = !text; }
+      function draw(items) {
+        clear(list);
+        listHead.hidden = !items.length;
+        items.forEach(function (r) {
+          var row = el("div", "kb-run-row", list);
+          var top = el("div", "kb-run-top", row);
+          el("strong", "", top, r.label || "Run link");
+          el("span", "kb-run-status kb-run-" + r.status, top, r.status === "live" ? (r.completedAt ? "Complete" : "Live") : r.status === "revoked" ? "Switched off" : "Expired");
+          el("div", "kb-run-line", row, runLine(r) + " · made " + relTime(r.createdAt));
+          var acts = el("div", "kb-run-acts", row);
+          var url = runLinkUrl(location.origin, r.token);
+          btn("Copy link", "btn", acts, function () { copyText(url, function (ok) { toast(ok ? "Run link copied" : "Could not copy the link"); }); });
+          var open = el("a", "btn", acts, "Open"); open.href = url; open.target = "_blank"; open.rel = "noopener";
+          if (r.status === "live") btn("Switch off", "btn kb-danger", acts, function () {
+            kb("POST", "/run/revoke", { runId: r.id }).then(function (res) {
+              if (res.status !== 200) { show(describeError(res.status, res.json)); return; }
+              toast("Run link switched off");
+              load();
+            });
+          });
+        });
+      }
+      function load() {
+        kb("GET", "/runs?id=" + encodeURIComponent(a.id)).then(function (r) { if (r.status === 200) draw(r.json.items || []); else show(describeError(r.status, r.json)); });
+      }
+      go.addEventListener("click", function () {
+        show("");
+        if (!sure.checked) { show("Tick the box to confirm you understand the link is public."); return; }
+        if (pii && !pii.checked) { show(describeError(422, { error: "pii_in_article" })); return; }
+        go.disabled = true;
+        kb("POST", "/run", { articleId: a.id, days: Number(days.value), label: label.value, confirmPublic: true, allowPii: !!pii }).then(function (r) {
+          go.disabled = false;
+          if (r.status !== 201) { show(describeError(r.status, r.json)); return; }
+          var url = runLinkUrl(location.origin, r.json.run.token);
+          clear(made);
+          made.hidden = false;
+          el("strong", "", made, "Run link ready");
+          var field = el("input", "kb-input kb-run-url", made); field.type = "text"; field.readOnly = true; field.value = url;
+          field.setAttribute("aria-label", "The run link");
+          field.addEventListener("focus", function () { field.select(); });
+          btn("Copy link", "btn kb-primary", made, function () { copyText(url, function (ok) { toast(ok ? "Run link copied" : "Could not copy the link"); }); });
+          label.value = "";
+          load();
+        });
+      });
+      load();
+    });
+    dlg.classList.add("wide");
   }
 
   function confirmDelete(a) {
@@ -1116,6 +1250,17 @@
     });
     function drawModes() { Array.prototype.forEach.call(modes.children, function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === panes.getAttribute("data-mode"))); }); }
     drawModes();
+    var ins = el("button", "btn kb-small", bodyLabel, "Insert email template");
+    ins.type = "button";
+    ins.title = "Adds an email block to the article. On a run link it appears with the {{details}} filled in, ready to copy or send.";
+    ins.addEventListener("click", function () {
+      var at = typeof text.selectionStart === "number" ? text.selectionEnd : text.value.length;
+      var before = text.value.slice(0, at), after = text.value.slice(at);
+      var lead = before && !/\n\n$/.test(before) ? (/\n$/.test(before) ? "\n" : "\n\n") : "";
+      text.value = before + lead + EMAIL_TEMPLATE + (after && after.charAt(0) !== "\n" ? "\n" : "") + after;
+      text.dispatchEvent(new Event("input", { bubbles: true }));
+      text.focus();
+    });
 
     var previewTimer = null;
     function drawPreview() {

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.barnyard.site; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none';">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>Run checklist — Barnyard Study</title>
+<link rel="stylesheet" href="shell.css?v=61714599">
+<link rel="stylesheet" href="notes.css?v=21059979">
+<link rel="stylesheet" href="run.css?v=42d31dbe">
+<script src="themes.js?v=70f6889a"></script>
+</head>
+<body class="run-page">
+
+<main id="page" class="run-main">
+
+  <noscript><p class="run-gate">This checklist needs JavaScript.</p></noscript>
+
+  <div id="run-gate" class="run-gate" hidden>
+    <h1>Run checklist</h1>
+    <p id="run-gate-msg"></p>
+  </div>
+
+  <div id="run" class="run" hidden>
+    <header class="run-head">
+      <p class="run-kicker">Run checklist</p>
+      <h1 id="run-title"></h1>
+      <p id="run-label" class="run-label" hidden></p>
+      <p id="run-by" class="run-dim"></p>
+      <div class="run-progress">
+        <progress id="run-bar" max="100" value="0"></progress>
+        <span id="run-count" aria-live="polite"></span>
+      </div>
+      <p id="run-complete" class="run-complete" hidden></p>
+      <div class="run-who-row">
+        <label class="run-name">Your first name <input id="run-name" type="text" maxlength="40" autocomplete="given-name" placeholder="Shown beside the steps you tick"></label>
+        <button type="button" class="btn" id="run-print">Print</button>
+      </div>
+      <p class="run-dim run-share">Anyone with this link can see this checklist and tick steps, and everyone sees the same ticks. Don't write passwords or keys here. <span id="run-expiry"></span></p>
+    </header>
+
+    <p id="run-msg" class="run-msg" role="status" hidden></p>
+
+    <section id="run-fields-wrap" class="run-fields-wrap" hidden>
+      <h2 class="run-h">Details for the emails</h2>
+      <p class="run-dim">Fill these in once; every email below uses them.</p>
+      <div id="run-fields" class="run-fields"></div>
+    </section>
+
+    <div id="run-body" class="run-body"></div>
+  </div>
+
+</main>
+
+<script src="markdown.js?v=16084133"></script>
+<script src="run.js?v=8b1baf81"></script>
+</body>
+</html>
