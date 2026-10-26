@@ -92,4 +92,21 @@ test("run lines say how far along, and for how long", function () {
   assert.ok(/```email/.test(k.EMAIL_TEMPLATE) && /\{\{date\}\}/.test(k.EMAIL_TEMPLATE));
 });
 
+test("the send box counts addresses the way the Worker will, without repeats", function () {
+  assert.strictEqual(r.countAddresses(""), 0);
+  assert.strictEqual(r.countAddresses("a@x.org"), 1);
+  assert.strictEqual(r.countAddresses("a@x.org, B@x.org; a@X.org\n c@y.org"), 3);
+  assert.strictEqual(r.countAddresses(" , ;; "), 0);
+});
+
+test("send failures are explained in plain words and never repeat what the server said", function () {
+  assert.ok(/Fill in these details first: contact, domain\./.test(r.sendErrorText("details_missing", { details: ["contact", "domain"] })));
+  assert.ok(/refused to send from that mailbox/.test(r.sendErrorText("send_failed", { reason: "forbidden" })));
+  assert.ok(/secret may have expired/.test(r.sendErrorText("send_failed", { reason: "auth" })));
+  assert.ok(/recent sign-in/.test(r.sendErrorText("recent_sign_in_required")));
+  assert.ok(/more than 25/.test(r.sendErrorText("too_many_recipients")));
+  assert.ok(/reach the server/.test(r.sendErrorText(undefined, {}, 0)));
+  assert.ok(!/AADSTS|stack/.test(r.sendErrorText("send_failed", { reason: "weird", message: "AADSTS70011" })));
+});
+
 console.log(passed + " passed");

@@ -113,7 +113,8 @@ On an SOP article (filed under Runbooks & procedures, tagged `sop`, or titled "S
 - `run.html` / `run.js` / `run.css`. The link's secret is in the address fragment (`#rl_...`), never sent to a server by the browser or put in a referrer; it is posted in the body to `api.barnyard.site/run/*`. The page has its own strict CSP (only that API), `noindex`, no referrer, and draws everything with `markdown.js` (DOM nodes, no innerHTML). It prints as a paper checklist.
 - **Email templates** are written in the article as ```` ```email ```` blocks (`Name:`, `To:`, `Subject:`, blank line, body; `{{details}}` to fill in once per run). The editor has an "Insert email template" button. On the run page every `{{detail}}` gets one box at the top, and each email shows the filled text with Copy subject / body / all and "Open in email app".
 - The steps are copied when the link is made; edit the article and make a new link to pick up the change. The dialog lists each link (progress, expiry, Copy link, Open, Switch off). Hiding or deleting the article ends its links. Rules and limits: Worker README, "Run links".
-- Tests: `node test/run.test.js` (token, placeholders, mail link, progress, wording).
+- **Send button (owner only):** when the visitor is signed in to the study site as the owner and the Worker has the shared mailbox set up, each email shows a "Send from it@..." panel: a To box (prefilled from the template's To, editable), a confirmation line with the number of addresses, and a status line ("Sent 26 Oct, 23:40 to 12 addresses by Nathan"). Everyone else never sees it (the page asks `GET /kb/run/send-status` with the login cookie and hides the panel unless it answers yes). The Worker builds the email itself; see Worker README, "Run links".
+- Tests: `node test/run.test.js` (token, placeholders, mail link, progress, send box, wording).
 
 ## Deploy
 
