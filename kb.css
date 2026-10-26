@@ -215,3 +215,23 @@
 .kb-cat-empty .kb-cover { background-image: none; background-color: var(--ka-soft); }
 .kb-cat-empty .kb-card-title { color: var(--fg); }
 .kb-h2-quiet { margin-top: 26px; font-size: 15px; color: var(--fg-dim); }
+
+/* ---- run links (the dialog on an SOP) */
+.kb-small { min-height: 28px !important; padding: 0 10px !important; font-size: 12px !important; align-self: flex-start; }
+.kb-run-form { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 560px; }
+.kb-run-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--fg-dim); }
+.kb-run-check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.45; }
+.kb-run-check input { margin-top: 3px; flex: none; }
+.kb-run-made { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 12px 14px; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent-soft); }
+.kb-run-made[hidden] { display: none; }
+.kb-run-url { font-family: var(--font-mono); font-size: 12.5px; }
+.kb-run-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.kb-run-row { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.kb-run-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.kb-run-status { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--fg-dim); }
+.kb-run-live { border-color: var(--ok); color: var(--ok); }
+.kb-run-line { font-size: 12.5px; color: var(--fg-dim); }
+.kb-run-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.kb-run-help { width: 100%; font-size: 13px; }
+.kb-run-help summary { cursor: pointer; color: var(--fg-strong); }
+.kb-run-example { margin: 8px 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font: 12.5px/1.5 var(--font-mono); overflow-x: auto; white-space: pre; }

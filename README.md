@@ -106,6 +106,15 @@ The shared side of the notebook. An article is a COPY of one or more notes that 
 - `markdown.js` links `[[Title]]` to articles through the page-supplied `hrefFor`/`findNote`/`missingTitle` options.
 - Notes page: a "Publish…" button on a note opens the generator with that note selected.
 
+### Run links: a public checklist from an SOP (`run.html`, 2026-10-26)
+
+On an SOP article (filed under Runbooks & procedures, tagged `sop`, or titled "SOP: ...") the author and the owner get a **Run links** button: pick how long the link works, tick that it is public, and get `https://study.barnyard.site/run.html#rl_...`. That page needs **no login**: it shows the procedure's steps from start to finish with a tick box each (plus a note and who/when), a progress bar, and the SOP's **email templates**. Everyone with the link sees the same ticks (the page refreshes every 15 seconds). Details:
+
+- `run.html` / `run.js` / `run.css`. The link's secret is in the address fragment (`#rl_...`), never sent to a server by the browser or put in a referrer; it is posted in the body to `api.barnyard.site/run/*`. The page has its own strict CSP (only that API), `noindex`, no referrer, and draws everything with `markdown.js` (DOM nodes, no innerHTML). It prints as a paper checklist.
+- **Email templates** are written in the article as ```` ```email ```` blocks (`Name:`, `To:`, `Subject:`, blank line, body; `{{details}}` to fill in once per run). The editor has an "Insert email template" button. On the run page every `{{detail}}` gets one box at the top, and each email shows the filled text with Copy subject / body / all and "Open in email app".
+- The steps are copied when the link is made; edit the article and make a new link to pick up the change. The dialog lists each link (progress, expiry, Copy link, Open, Switch off). Hiding or deleting the article ends its links. Rules and limits: Worker README, "Run links".
+- Tests: `node test/run.test.js` (token, placeholders, mail link, progress, wording).
+
 ## Deploy
 
 GitHub Pages, custom domain `study.barnyard.site` (see `CNAME`), DNS + TLS via Cloudflare (proxied CNAME on the `barnyard.site` zone, matching `dashboard`/`stocks`/`api`'s existing setup).
