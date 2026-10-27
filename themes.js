@@ -473,7 +473,20 @@
     var apps = null;
     if (Array.isArray(j.apps)) apps = j.apps.filter(function (a) { return typeof a === "string" && a.length <= 20; }).slice(0, 10);
     // chat: may this person use the Claude chat (a display hint for the nav; the Worker still checks every request)
-    return { authenticated: true, owner: j.owner === true ? true : j.owner === false ? false : null, apps: apps, chat: j.chat === true };
+    var out = { authenticated: true, owner: j.owner === true ? true : j.owner === false ? false : null, apps: apps, chat: j.chat === true };
+    // permissions: what the owner's Users page leaves this person ("ops.view", "assets.view" ...). Only kept when the Worker
+    // sent a list; a page then hides what the list lacks. access: "owner" | "active" | "suspended" | "expired".
+    if (Array.isArray(j.permissions)) out.permissions = j.permissions.filter(function (p) { return typeof p === "string" && p.length <= 64; }).slice(0, 200);
+    if (j.access && typeof j.access.status === "string" && /^(owner|active|suspended|expired)$/.test(j.access.status)) out.access = j.access.status;
+    return out;
+  }
+
+  // May this person use the area named by `perm` (for example "ops.view")? The owner always; anyone when the Worker sent no list
+  // (an older Worker, or the list is unknown), so nothing is hidden by mistake. Presentation only: the Worker refuses the request.
+  function sessionPermits(session, perm) {
+    if (!perm || !session || !session.authenticated || session.owner === true) return true;
+    if (!Array.isArray(session.permissions)) return true;
+    return session.permissions.indexOf(perm) !== -1;
   }
 
   // May this person use `app` ("study", "campaign")? Anything unknown is allowed.
@@ -515,7 +528,7 @@
   }
 
   var whoApi = {
-    load: loadWho, allows: sessionAllows, isGuest: isGuest, clean: cleanSession,
+    load: loadWho, allows: sessionAllows, permits: sessionPermits, isGuest: isGuest, clean: cleanSession,
     get: function () { return who; },
     // fn(session) now if it is already known, and again whenever it changes.
     onChange: function (fn) { whoListeners.push(fn); if (who) { try { fn(who); } catch (e) { /* ignore */ } } }

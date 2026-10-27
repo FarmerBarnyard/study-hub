@@ -40,28 +40,32 @@
 
   var HUB = "https://dashboard.barnyard.site/";
   var PAGES = [
-    { id: "overview", title: "Overview", group: "", icon: "home", path: "", local: "./" },
-    { id: "ops", title: "Ops board", group: "Work", icon: "board", path: "ops.html", local: "ops.html" },
-    { id: "vuln", title: "Vulnerabilities", group: "Work", icon: "shield", path: "vulnerabilities.html", local: "vulnerabilities.html" },
+    // perm: the permission the owner's Users page can take away ("ops.view"); a link is hidden when the signed-in person's
+    // permissions list exists and lacks it (presentation only: the Worker refuses the request).
+    { id: "overview", title: "Overview", group: "", icon: "home", path: "", local: "./", perm: "overview.view" },
+    { id: "ops", title: "Ops board", group: "Work", icon: "board", path: "ops.html", local: "ops.html", perm: "ops.view" },
+    { id: "vuln", title: "Vulnerabilities", group: "Work", icon: "shield", path: "vulnerabilities.html", local: "vulnerabilities.html", perm: "vuln.view" },
     // ownerOnly: shown only to the hub owner (Theme.who says owner === true), and hidden until that is known.
-    { id: "calendar", title: "Calendar", group: "Work", icon: "calendar", path: "calendar.html", local: "calendar.html", ownerOnly: true },
-    { id: "monitor", title: "Monitoring", group: "Work", icon: "pulse", path: "monitoring.html", local: "monitoring.html", ownerOnly: true },
+    { id: "calendar", title: "Calendar", group: "Work", icon: "calendar", path: "calendar.html", local: "calendar.html", ownerOnly: true, perm: "calendar.view" },
+    { id: "monitor", title: "Monitoring", group: "Work", icon: "pulse", path: "monitoring.html", local: "monitoring.html", ownerOnly: true, perm: "monitoring.view" },
+    { id: "users", title: "Users", group: "Work", icon: "people", path: "users.html", local: "users.html", ownerOnly: true, perm: "users.view" },
     // chatOnly: the Claude chat: the owner, and anyone the Worker says may use it (Theme.who says chat === true,
     // which is true for a guest only while the owner has switched guest chats on). Hidden until that is known.
-    { id: "chat", title: "Claude", group: "Work", icon: "chat", path: "chat.html", local: "chat.html", chatOnly: true },
+    { id: "chat", title: "Claude", group: "Work", icon: "chat", path: "chat.html", local: "chat.html", chatOnly: true, perm: "chat.view" },
     // `app` is the group-backed app a link needs; a signed-in person whose groups
     // do not include it does not see the link (see Theme.who in themes.js).
-    { id: "study", title: "Study", group: "Sites", icon: "book", url: "https://study.barnyard.site/", app: "study" },
-    { id: "notes", title: "Notes", group: "Sites", icon: "note", url: "https://study.barnyard.site/notes.html", app: "study" },
-    { id: "kb", title: "Knowledgebase", group: "Sites", icon: "bulb", url: "https://study.barnyard.site/knowledgebase.html", app: "study" },
-    { id: "campaign", title: "Campaign", group: "Sites", icon: "map", url: "https://campaign.barnyard.site/", app: "campaign" },
-    { id: "stocks", title: "Stocks", group: "Sites", icon: "chart", url: "https://stocks.barnyard.site/" }
+    { id: "study", title: "Study", group: "Sites", icon: "book", url: "https://study.barnyard.site/", app: "study", perm: "study.view" },
+    { id: "notes", title: "Notes", group: "Sites", icon: "note", url: "https://study.barnyard.site/notes.html", app: "study", perm: "notebook.view" },
+    { id: "kb", title: "Knowledgebase", group: "Sites", icon: "bulb", url: "https://study.barnyard.site/knowledgebase.html", app: "study", perm: "kb.view" },
+    { id: "campaign", title: "Campaign", group: "Sites", icon: "map", url: "https://campaign.barnyard.site/", app: "campaign", perm: "campaign.view" },
+    { id: "stocks", title: "Stocks", group: "Sites", icon: "chart", url: "https://stocks.barnyard.site/", perm: "stocks.view" }
   ];
 
   var ICONS = {
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
     board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
     chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-7l-5 4v-4H6a2 2 0 01-2-2z"/><path d="M8 9h8M8 12h5"/>',
+    people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.2 3.9 1.7 4.3 4.3"/>',
     calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     pulse: '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>',
     shield: '<path d="M12 3l7 3v5.5c0 4.4-3 8.2-7 9.5-4-1.3-7-5.1-7-9.5V6z"/><path d="M12 8v4.5M12 15.5v.01"/>',
@@ -129,6 +133,8 @@
   // until it is known, and whenever it cannot be known, every link shows).
   var navLinks = {};
   function pageAllowed(p) {
+    // The owner's Users page can take an area away from one person (their permissions list lacks it).
+    if (p.perm && Theme.who && Theme.who.permits && !Theme.who.permits(Theme.who.get(), p.perm)) return false;
     // An owner-only page is shown only once the person is known to be the owner (it fails closed, unlike the app links).
     if (p.ownerOnly) { var s = Theme.who && Theme.who.get(); return !!s && s.owner === true; }
     if (p.chatOnly) { var c = Theme.who && Theme.who.get(); return !!c && (c.owner === true || c.chat === true); }
@@ -136,6 +142,17 @@
   }
   function applyWho() {
     PAGES.forEach(function (p) { if (navLinks[p.id]) navLinks[p.id].hidden = !pageAllowed(p); });
+    // A group heading with nothing visible under it is hidden too.
+    var navEl = document.querySelector(".nav");
+    if (navEl) {
+      var heading = null, any = false;
+      var close = function () { if (heading) heading.hidden = !any; };
+      Array.prototype.forEach.call(navEl.children, function (c) {
+        if (c.classList.contains("nav-group")) { close(); heading = c; any = false; }
+        else if (!c.hidden) any = true;
+      });
+      close();
+    }
   }
 
   function build() {
@@ -184,7 +201,7 @@
       if (p.id === "ops") { els.badge = h("span", "badge", "0"); els.badge.hidden = true; a.appendChild(els.badge); }
       var abs = new URL(a.href, location.href);
       if (abs.origin !== location.origin) a.appendChild(svg("ext", "ext"));
-      if (p.app || p.ownerOnly || p.chatOnly) navLinks[p.id] = a;
+      if (p.app || p.ownerOnly || p.chatOnly || p.perm) navLinks[p.id] = a;
       if (p.ownerOnly || p.chatOnly) a.hidden = !pageAllowed(p);
       nav.appendChild(a);
     });
