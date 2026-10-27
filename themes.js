@@ -98,8 +98,26 @@
     return {
       theme: "amber", mode: "dark", bg: "plain", bgs: "medium", density: "comfortable", sidebar: "full",
       widgets: DEFAULT_WIDGETS.map(function (w) { return { id: w.id, visible: w.visible, size: w.size }; }),
+      board: null,
       opsLayout: "board", foldBacklog: null
     };
+  }
+
+  // The Overview board's tile places: null (never customised) or {v: 1, tiles: [{id, x, y, w, h}]} on a
+  // 12-column grid. Only the shape is checked here (known widget ids, each once, whole numbers on the grid);
+  // board-layout.js settles overlaps and size limits when the Overview reads it back.
+  function whole(n, lo, hi) { return typeof n === "number" && isFinite(n) && Math.floor(n) === n && n >= lo && n <= hi; }
+  function normalizeBoard(raw) {
+    if (!raw || typeof raw !== "object" || raw.v !== 1 || !Array.isArray(raw.tiles)) return null;
+    var seen = {}, tiles = [];
+    for (var i = 0; i < raw.tiles.length && tiles.length < WIDGET_IDS.length; i++) {
+      var t = raw.tiles[i];
+      if (!t || typeof t.id !== "string" || WIDGET_IDS.indexOf(t.id) === -1 || seen[t.id]) continue;
+      if (!whole(t.w, 1, 12) || !whole(t.x, 0, 11) || t.x + t.w > 12 || !whole(t.h, 1, 40) || !whole(t.y, 0, 399)) continue;
+      seen[t.id] = true;
+      tiles.push({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h });
+    }
+    return tiles.length ? { v: 1, tiles: tiles } : null;
   }
 
   // Anything goes in, a valid settings object comes out. Unknown or malformed
@@ -130,6 +148,7 @@
       }
       out.widgets = list;
     }
+    out.board = normalizeBoard(raw.board);
     return out;
   }
 
