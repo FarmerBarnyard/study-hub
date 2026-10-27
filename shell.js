@@ -2,7 +2,7 @@
 // light/dark switch, Settings), page-background layer and the Settings panel.
 //
 // A page supplies only its own content, inside <main id="page" class="content">,
-// and says which page it is with <body data-shell="overview|ops|vuln|chat|study|kb|campaign|stocks">.
+// and says which page it is with <body data-shell="overview|ops|vuln|calendar|chat|study|kb|campaign|stocks">.
 // This script wraps that content in the shell.
 //
 // A generated page whose body this repo does not author (the Stocks dashboard,
@@ -44,6 +44,7 @@
     { id: "ops", title: "Ops board", group: "Work", icon: "board", path: "ops.html", local: "ops.html" },
     { id: "vuln", title: "Vulnerabilities", group: "Work", icon: "shield", path: "vulnerabilities.html", local: "vulnerabilities.html" },
     // ownerOnly: shown only to the hub owner (Theme.who says owner === true), and hidden until that is known.
+    { id: "calendar", title: "Calendar", group: "Work", icon: "calendar", path: "calendar.html", local: "calendar.html", ownerOnly: true },
     // chatOnly: the Claude chat: the owner, and anyone the Worker says may use it (Theme.who says chat === true,
     // which is true for a guest only while the owner has switched guest chats on). Hidden until that is known.
     { id: "chat", title: "Claude", group: "Work", icon: "chat", path: "chat.html", local: "chat.html", chatOnly: true },
@@ -60,6 +61,7 @@
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
     board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
     chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-7l-5 4v-4H6a2 2 0 01-2-2z"/><path d="M8 9h8M8 12h5"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     shield: '<path d="M12 3l7 3v5.5c0 4.4-3 8.2-7 9.5-4-1.3-7-5.1-7-9.5V6z"/><path d="M12 8v4.5M12 15.5v.01"/>',
     note: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
     book: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',
@@ -109,6 +111,7 @@
     if (/(^|\/)ops\.html$/.test(location.pathname)) return "ops";
     if (/(^|\/)chat\.html$/.test(location.pathname)) return "chat";
     if (/(^|\/)vulnerabilities\.html$/.test(location.pathname)) return "vuln";
+    if (/(^|\/)calendar\.html$/.test(location.pathname)) return "calendar";
     return "overview";
   }
 
