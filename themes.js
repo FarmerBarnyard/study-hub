@@ -543,6 +543,45 @@
     onAdopt: function (fn) { adoptListeners.push(fn); }
   };
 
+  // The Worker's free daily storage allowance can run out (it renews at 00:00 UTC, 08:00 Perth). Every call to the
+  // API then answers 503 {"error":"daily_limit_reached"}; this notices that on any page and shows one calm line,
+  // instead of an error on every tile. Nothing else about the page's own fetch handling changes.
+  function showLimit() {
+    var doc = root.document;
+    if (!doc || !doc.body || doc.getElementById("barnyard-limit-banner")) return;
+    var bar = doc.createElement("div");
+    bar.id = "barnyard-limit-banner";
+    bar.setAttribute("role", "status");
+    bar.style.cssText = "position:sticky;top:0;z-index:9999;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;padding:8px 16px;font:14px/1.4 system-ui,sans-serif;text-align:center;background:#f6e7bf;color:#3b2a00;border-bottom:1px solid #d9bd73";
+    var text = doc.createElement("span");
+    text.textContent = "The free daily limit of the Worker's storage was reached. It renews at 08:00 Perth, and nothing is lost.";
+    var close = doc.createElement("button");
+    close.type = "button";
+    close.textContent = "Dismiss";
+    close.style.cssText = "font:inherit;padding:2px 10px;border:1px solid #8a6a1f;background:transparent;color:inherit;border-radius:6px;cursor:pointer";
+    close.addEventListener("click", function () { if (bar.parentNode) bar.parentNode.removeChild(bar); });
+    bar.appendChild(text);
+    bar.appendChild(close);
+    doc.body.insertBefore(bar, doc.body.firstChild);
+  }
+
+  function watchLimit(onLimit) {
+    var realFetch = root.fetch;
+    if (typeof realFetch !== "function" || realFetch.__barnyardLimitWatch) return;
+    var wrapped = function () {
+      return realFetch.apply(root, arguments).then(function (res) {
+        try {
+          if (res && res.status === 503 && typeof res.url === "string" && res.url.indexOf("https://api.barnyard.site/") === 0) {
+            res.clone().json().then(function (j) { if (j && j.error === "daily_limit_reached") (onLimit || showLimit)(); }, function () { /* not JSON */ });
+          }
+        } catch (e) { /* the page's own handling goes on */ }
+        return res;
+      });
+    };
+    wrapped.__barnyardLimitWatch = true;
+    root.fetch = wrapped;
+  }
+
   var api = {
     THEMES: THEMES, THEME_GROUPS: THEME_GROUPS, BACKGROUNDS: BACKGROUNDS, BACKGROUND_GROUPS: BACKGROUND_GROUPS,
     WIDGET_IDS: WIDGET_IDS, DEFAULT_WIDGETS: DEFAULT_WIDGETS, COLOUR_VARS: COLOUR_VARS,
@@ -552,11 +591,13 @@
     get: function () { return current; },
     onChange: function (fn) { listeners.push(fn); },
     sync: sync,
-    who: whoApi
+    who: whoApi,
+    _limit: { watch: watchLimit, show: showLimit }
   };
 
   root.BarnyardTheme = api;
   if (root.document && root.document.documentElement) {
+    watchLimit();
     load();
     // Start the profile sync once the page has had its first paint.
     // Who is signed in is asked at once (a hidden link should not flash first);
