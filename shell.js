@@ -168,6 +168,7 @@
     // ownerOnly: shown only to the hub owner (Theme.who says owner === true), and hidden until that is known.
     { id: "calendar", title: "Calendar", group: "Work", icon: "calendar", path: "calendar.html", local: "calendar.html", ownerOnly: true, perm: "calendar.view" },
     { id: "monitor", title: "Monitoring", group: "Work", icon: "pulse", path: "monitoring.html", local: "monitoring.html", ownerOnly: true, perm: "monitoring.view" },
+    { id: "incidents", title: "Incidents", group: "Work", icon: "alert", path: "incidents.html", local: "incidents.html", ownerOnly: true, perm: "incidents.view" },
     { id: "users", title: "Users", group: "Work", icon: "people", path: "users.html", local: "users.html", ownerOnly: true, perm: "users.view" },
     // chatOnly: the Claude chat: the owner, and anyone the Worker says may use it (Theme.who says chat === true,
     // which is true for a guest only while the owner has switched guest chats on). Hidden until that is known.
@@ -188,6 +189,7 @@
     people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.2 3.9 1.7 4.3 4.3"/>',
     calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     pulse: '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>',
+    alert: '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
     shield: '<path d="M12 3l7 3v5.5c0 4.4-3 8.2-7 9.5-4-1.3-7-5.1-7-9.5V6z"/><path d="M12 8v4.5M12 15.5v.01"/>',
     note: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
     book: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',
@@ -239,6 +241,7 @@
     if (/(^|\/)vulnerabilities\.html$/.test(location.pathname)) return "vuln";
     if (/(^|\/)calendar\.html$/.test(location.pathname)) return "calendar";
     if (/(^|\/)monitoring\.html$/.test(location.pathname)) return "monitor";
+    if (/(^|\/)incidents\.html$/.test(location.pathname)) return "incidents";
     return "overview";
   }
 
