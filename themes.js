@@ -98,7 +98,7 @@
     return {
       theme: "amber", mode: "dark", bg: "plain", bgs: "medium", density: "comfortable", sidebar: "full",
       widgets: DEFAULT_WIDGETS.map(function (w) { return { id: w.id, visible: w.visible, size: w.size }; }),
-      board: null,
+      board: null, boardSets: null,
       opsLayout: "board", foldBacklog: null
     };
   }
@@ -119,6 +119,28 @@
       tiles.push({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h });
     }
     return tiles.length ? { v: 1, tiles: tiles } : null;
+  }
+
+  // Named Overview layouts, one per kind of screen: null (none saved) or
+  // {v: 1, layouts: [{id, name, tiles: [{id, x, y, w, h}]}], pick: {wide, standard, compact}}: at most four layouts, and
+  // a pick that names one of them, or null for the standard arrangement (board-layout.js explains it). Only the shape is
+  // checked here; board-layout.js settles overlaps and sizes when the Overview reads it back.
+  function normalizeBoardSets(raw) {
+    if (!raw || typeof raw !== "object" || raw.v !== 1 || !Array.isArray(raw.layouts)) return null;
+    var seen = {}, layouts = [];
+    for (var i = 0; i < raw.layouts.length && layouts.length < 4; i++) {
+      var l = raw.layouts[i];
+      if (!l || typeof l !== "object" || typeof l.id !== "string" || !/^[a-z0-9]{1,12}$/.test(l.id) || seen[l.id]) continue;
+      var name = typeof l.name === "string" ? l.name.replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, 24).trim() : "";
+      var board = normalizeBoard({ v: 1, tiles: l.tiles });
+      if (!name || !board) continue;
+      seen[l.id] = true;
+      layouts.push({ id: l.id, name: name, tiles: board.tiles });
+    }
+    if (!layouts.length) return null;
+    var pick = {};
+    ["wide", "standard", "compact"].forEach(function (c) { var p = raw.pick && raw.pick[c]; pick[c] = typeof p === "string" && seen[p] ? p : null; });
+    return { v: 1, layouts: layouts, pick: pick };
   }
 
   // Anything goes in, a valid settings object comes out. Unknown or malformed
@@ -150,6 +172,7 @@
       out.widgets = list;
     }
     out.board = normalizeBoard(raw.board);
+    out.boardSets = normalizeBoardSets(raw.boardSets);
     return out;
   }
 
