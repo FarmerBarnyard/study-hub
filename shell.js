@@ -25,6 +25,15 @@
 //   setConnection(status)                     show the Live / Reconnecting pill
 //   setBadge(n)                               the number on the Ops nav item
 //   toast(text)                               a short confirmation
+//   openSettings(tabId?)                      open Settings, on that tab when it exists
+//   palette.open() / close()                  the command palette (Ctrl+K or Cmd+K on every page)
+//   palette.registerCommands(fn)              fn() -> [{ title, hint, keywords, run }]: commands a page adds to the palette
+//
+// The command palette jumps to any page the person may use (the same permission rules as the sidebar, so a tab the
+// owner hid from them never appears), changes the look (mode, theme, spacing), and, on the hub for its owner, files a
+// to-do or an Ops proposal and searches the Ops board, Notebook and Knowledgebase. That search is ONE request per
+// settled query: at least three letters, 450 ms after the last key, answered from a 60 second cache when the same words
+// were asked a moment ago, and at most ten a minute. Nothing is sent while the palette is closed.
 //
 // Everything that reaches the page is built with textContent / createElement,
 // never innerHTML, and the Settings swatches are coloured through the CSSOM
@@ -35,7 +44,118 @@
 
 (function () {
   "use strict";
-  if (typeof document === "undefined" || !window.BarnyardTheme) return;
+
+  // ---- command palette: the parts that need no page (tested in test/palette.test.js) ----------------------
+  var Logic = paletteLogic();
+  function paletteLogic() {
+    var HUB_ORIGIN = "https://dashboard.barnyard.site", API = "https://api.barnyard.site";
+    var SERVER_MIN = 3, DEBOUNCE_MS = 450, CACHE_MS = 60000, CACHE_MAX = 30, PER_MINUTE = 10, SHOW_MAX = 6;
+
+    function norm(s) { return String(s == null ? "" : s).toLowerCase().replace(/\s+/g, " ").trim(); }
+
+    // How well `text` answers the query, 0 (not at all) to 100 (the same words).
+    function score(query, text) {
+      var q = norm(query), t = norm(text);
+      if (!q) return 1;
+      if (!t) return 0;
+      if (t === q) return 100;
+      if (t.indexOf(q) === 0) return 80;
+      if (t.indexOf(" " + q) !== -1) return 60;
+      var words = q.split(" ");
+      if (words.length > 1 && words.every(function (w) { return (" " + t).indexOf(" " + w) !== -1; })) return 50;
+      if (t.indexOf(q) !== -1) return 40;
+      if (q.length <= 6 && q.indexOf(" ") === -1 && t.charAt(0) === q.charAt(0)) {   // letters in order from the first: "ovw" finds "Overview"
+        var i = 0;
+        for (var k = 0; k < t.length && i < q.length; k++) if (t.charAt(k) === q.charAt(i)) i++;
+        if (i === q.length) return 20;
+      }
+      return 0;
+    }
+
+    // The items that answer the query, best first (ties keep their order); an empty query keeps them all in order.
+    function rank(items, query, limit) {
+      var scored = [];
+      (items || []).forEach(function (it, n) {
+        var s = Math.max(score(query, it.title), it.keywords ? score(query, it.keywords) - 10 : 0);
+        if (s > 0) scored.push([s, n, it]);
+      });
+      scored.sort(function (a, b) { return b[0] - a[0] || a[1] - b[1]; });
+      return scored.slice(0, limit || SHOW_MAX).map(function (x) { return x[2]; });
+    }
+
+    // Only links the Worker could have made: a page of the hub, or the study site. -> an absolute address, or "".
+    function safeHref(href) {
+      var h = String(href == null ? "" : href);
+      if (/^[a-z-]{1,24}\.html(#[A-Za-z0-9_\/-]{1,60})?$/.test(h)) return HUB_ORIGIN + "/" + h;
+      if (/^https:\/\/study\.barnyard\.site\/(notes|knowledgebase)\.html#[A-Za-z0-9_\/-]{1,60}$/.test(h)) return h;
+      return "";
+    }
+
+    // A search answer, kept to what the palette shows: [{ title, items: [{ title, hint, href }] }], every link checked.
+    function cleanGroups(data) {
+      var out = [];
+      (data && Array.isArray(data.groups) ? data.groups : []).slice(0, 4).forEach(function (g) {
+        if (!g || g.skipped || g.error || !Array.isArray(g.items)) return;
+        var items = [];
+        g.items.slice(0, SHOW_MAX).forEach(function (x) {
+          var href = x && safeHref(x.href);
+          if (href && x.title) items.push({ title: String(x.title).slice(0, 120), hint: String(x.hint || "").slice(0, 40), href: href });
+        });
+        if (items.length) out.push({ title: String(g.title || "Results").slice(0, 40), items: items });
+      });
+      return out;
+    }
+
+    // What "add this" sends, per kind -> { path, body, done } or null when there is nothing to file or it is too long.
+    function capture(kind, text) {
+      var t = String(text == null ? "" : text).replace(/\r\n/g, "\n").trim();
+      if (!t) return null;
+      var first = t.split("\n")[0].replace(/\s+/g, " ").trim();
+      if (kind === "todo") {
+        if (!first || t.length > 4200) return null;
+        var body = { title: first.slice(0, 200) };
+        if (t.length > body.title.length) body.notes = t.slice(0, 4000);
+        return { path: "/planner/task", body: body, done: "To-do added" };
+      }
+      if (kind === "proposal") {
+        var title = first.slice(0, 120).trim();
+        if (!title || t.length > 6000) return null;
+        var p = { title: title, lane: "backlog", category: "other", proposal: true };
+        if (t.length > title.length) p.details = t;
+        return { path: "/ops/items", body: p, done: "Proposal added for you to approve" };
+      }
+      return null;
+    }
+
+    // A small time-limited memory of search answers, keyed by the words asked.
+    function makeCache(now) {
+      var clock = now || Date.now, rows = {}, keys = [];
+      return {
+        get: function (q) { var r = rows[q]; if (!r) return null; if (clock() - r.at > CACHE_MS) { delete rows[q]; keys = keys.filter(function (k) { return k !== q; }); return null; } return r.value; },
+        set: function (q, value) {
+          if (!rows[q]) keys.push(q);
+          rows[q] = { at: clock(), value: value };
+          while (keys.length > CACHE_MAX) delete rows[keys.shift()];
+        }
+      };
+    }
+
+    // At most `max` takes in any `windowMs`.
+    function makeLimiter(max, windowMs, now) {
+      var clock = now || Date.now, stamps = [];
+      return { take: function () { var t = clock(); stamps = stamps.filter(function (s) { return t - s < windowMs; }); if (stamps.length >= max) return false; stamps.push(t); return true; } };
+    }
+
+    return {
+      norm: norm, score: score, rank: rank, safeHref: safeHref, cleanGroups: cleanGroups, capture: capture, makeCache: makeCache, makeLimiter: makeLimiter,
+      HUB_ORIGIN: HUB_ORIGIN, API: API, SERVER_MIN: SERVER_MIN, DEBOUNCE_MS: DEBOUNCE_MS, CACHE_MS: CACHE_MS, CACHE_MAX: CACHE_MAX, PER_MINUTE: PER_MINUTE, SHOW_MAX: SHOW_MAX
+    };
+  }
+
+  if (typeof document === "undefined" || !window.BarnyardTheme) {
+    if (typeof module !== "undefined" && module.exports) module.exports = Logic;
+    return;
+  }
   var Theme = window.BarnyardTheme;
 
   var HUB = "https://dashboard.barnyard.site/";
@@ -274,6 +394,10 @@
     box.setAttribute("role", "listbox");
     box.hidden = true;
     wrap.appendChild(input);
+    var hint = h("kbd", "pal-key", /Mac|iPhone|iPad/.test(navigator.platform || "") ? "⌘K" : "Ctrl K");
+    hint.setAttribute("aria-hidden", "true");
+    hint.title = "Open the command palette";
+    wrap.appendChild(hint);
     wrap.appendChild(box);
     var idx = -1;
 
@@ -327,6 +451,273 @@
     fit();
     return wrap;
   }
+
+  // ---- command palette (Ctrl+K / Cmd+K) ----------------------------------------------------------------------
+
+  var palette = { el: null, input: null, list: null, status: null, items: [], idx: 0, mode: null, opener: null, open: false, busy: false, extra: [],
+    server: { q: "", state: "idle", groups: [] }, timer: null, ctrl: null, cache: Logic.makeCache(), limiter: Logic.makeLimiter(Logic.PER_MINUTE, 60000) };
+
+  // The server-backed parts work on the hub's own origin only (the Worker's /hub, /planner and /ops answer nothing else).
+  function onHubOrigin() { return location.origin === Logic.HUB_ORIGIN; }
+  function signedInOwner() { var s = Theme.who && Theme.who.get(); return !!s && s.owner === true; }
+  function mayUse(perm) { return !(Theme.who && Theme.who.permits && !Theme.who.permits(Theme.who.get(), perm)); }
+
+  function paletteCommands(typed) {
+    var list = [];
+    if (onHubOrigin() && signedInOwner()) {
+      if (mayUse("calendar.view")) list.push({ group: "Add", title: "Add a to-do", hint: "Calendar", keywords: "task todo new", ask: "todo", prompt: "What needs doing? Press Enter to add it." });
+      if (mayUse("ops.view")) list.push({ group: "Add", title: "Add an Ops proposal", hint: "Ops board", keywords: "idea suggestion new", ask: "proposal", prompt: "Describe the idea. The first line is the title. Press Enter to add it." });
+    }
+    PAGES.filter(pageAllowed).forEach(function (p) {
+      list.push({ group: "Go to", title: p.title, hint: p.group || "Page", keywords: "open " + p.id, run: function () { location.href = pageHref(p); } });
+    });
+    list.push({ group: "Actions", title: Theme.isDark() ? "Switch to light mode" : "Switch to dark mode", hint: "Appearance", keywords: "theme mode dark light", run: function () { Theme.set({ mode: Theme.isDark() ? "light" : "dark" }); } });
+    list.push({ group: "Actions", title: Theme.get().density === "compact" ? "Use comfortable spacing" : "Use compact spacing", hint: "Appearance", keywords: "density", run: function () { Theme.set({ density: Theme.get().density === "compact" ? "comfortable" : "compact" }); } });
+    list.push({ group: "Actions", title: "Open settings", hint: "Appearance", keywords: "preferences theme background", run: function () { openSettings(); } });
+    palette.extra.forEach(function (fn) {
+      var got = [];
+      try { got = fn() || []; } catch (e) { got = []; }
+      got.forEach(function (c) { if (c && c.title && typeof c.run === "function") list.push({ group: "Actions", title: String(c.title), hint: c.hint ? String(c.hint) : "", keywords: c.keywords ? String(c.keywords) : "", run: c.run }); });
+    });
+    if (typed) {   // eighteen themes would crowd the empty list, so they appear once the person types
+      Theme.THEMES.forEach(function (t) { list.push({ group: "Themes", title: "Theme: " + t.name, hint: "Appearance", keywords: "colour color look", run: function () { Theme.set({ theme: t.id }); toast("Theme: " + t.name); } }); });
+    }
+    return list;
+  }
+
+  var PALETTE_GROUPS = ["Add", "Go to", "Actions", "Themes"];
+
+  function paletteRows() {
+    var q = palette.input.value;
+    if (palette.mode) return [];
+    var typed = !!Logic.norm(q);
+    var all = paletteCommands(typed), rows = [];
+    PALETTE_GROUPS.forEach(function (g) {
+      var inGroup = all.filter(function (c) { return c.group === g; });
+      Logic.rank(inGroup, q, typed ? Logic.SHOW_MAX : 20).forEach(function (c) { rows.push(c); });
+    });
+    if (searchSource && typed) {
+      var found = [];
+      try { found = searchSource(); } catch (e) { found = []; }
+      Logic.rank(found, q, Logic.SHOW_MAX).forEach(function (x) { rows.push({ group: "On this page", title: x.title, hint: x.hint || "", run: x.go }); });
+    }
+    var sv = palette.server;
+    if (sv.q === Logic.norm(q)) {
+      sv.groups.forEach(function (g) { g.items.forEach(function (x) { rows.push({ group: g.title, title: x.title, hint: x.hint, run: function () { location.href = x.href; } }); }); });
+    }
+    return rows;
+  }
+
+  function paletteNote(text) { var n = h("div", "pal-note", text); return n; }
+
+  function paletteDraw() {
+    if (!palette.open) return;
+    var list = palette.list;
+    clear(list);
+    var q = palette.input.value;
+    palette.items = [];
+    if (palette.mode) {
+      var text = q.trim(), b = h("button", "pal-row");
+      b.type = "button";
+      b.setAttribute("role", "option");
+      b.id = "pal-opt-0";
+      b.setAttribute("aria-selected", "true");
+      b.appendChild(h("span", "pal-title", text ? "Add “" + (text.length > 70 ? text.slice(0, 70) + "…" : text) + "”" : palette.mode.prompt));
+      b.appendChild(h("span", "dim", text ? "Enter" : ""));
+      if (text) b.addEventListener("click", function () { paletteSubmit(); });
+      list.appendChild(b);
+      palette.items = text ? [{ run: paletteSubmit }] : [];
+      palette.idx = 0;
+      palette.input.setAttribute("aria-activedescendant", "pal-opt-0");
+      paletteAnnounce(text ? "Press Enter to add." : palette.mode.prompt);
+      return;
+    }
+    var rows = paletteRows(), lastGroup = null;
+    if (palette.idx >= rows.length) palette.idx = Math.max(0, rows.length - 1);
+    rows.forEach(function (row, n) {
+      if (row.group !== lastGroup) { list.appendChild(h("div", "pal-grp", row.group)); lastGroup = row.group; }
+      var b2 = h("button", "pal-row");
+      b2.type = "button";
+      b2.id = "pal-opt-" + n;
+      b2.setAttribute("role", "option");
+      b2.setAttribute("aria-selected", String(n === palette.idx));
+      b2.appendChild(h("span", "pal-title", row.title));
+      if (row.hint) b2.appendChild(h("span", "dim", row.hint));
+      b2.addEventListener("click", function () { paletteRun(row); });
+      b2.addEventListener("mousemove", function () { if (palette.idx !== n) { palette.idx = n; paletteMark(); } });
+      list.appendChild(b2);
+    });
+    palette.items = rows;
+    var sv = palette.server, asked = Logic.norm(q);
+    if (sv.q === asked && sv.state === "loading") list.appendChild(paletteNote("Searching the Ops board, Notebook and Knowledgebase…"));
+    else if (sv.q === asked && sv.state === "error") list.appendChild(paletteNote("Couldn't search just now."));
+    else if (sv.q === asked && sv.state === "limited") list.appendChild(paletteNote("You're searching quickly. Wait a few seconds and try again."));
+    if (!rows.length && !(sv.q === asked && sv.state !== "done")) {
+      list.appendChild(paletteNote(asked ? "Nothing matches “" + q.trim() + "”." + (paletteServerOk() && asked.length < Logic.SERVER_MIN ? " Type " + (Logic.SERVER_MIN - asked.length) + " more letter" + (Logic.SERVER_MIN - asked.length === 1 ? "" : "s") + " to search your notes and items." : "") : "Type a page, an action or a word to search for."));
+    }
+    palette.input.setAttribute("aria-activedescendant", rows.length ? "pal-opt-" + palette.idx : "");
+    paletteAnnounce(rows.length ? rows.length + (rows.length === 1 ? " result" : " results") : "No results");
+  }
+
+  function paletteAnnounce(text) { if (palette.status) palette.status.textContent = text; }
+
+  function paletteMark() {
+    var opts = palette.list.querySelectorAll(".pal-row");
+    Array.prototype.forEach.call(opts, function (o, n) { o.setAttribute("aria-selected", String(n === palette.idx)); });
+    if (opts[palette.idx]) { opts[palette.idx].scrollIntoView({ block: "nearest" }); palette.input.setAttribute("aria-activedescendant", opts[palette.idx].id); }
+  }
+
+  function paletteServerOk() { return onHubOrigin() && signedInOwner(); }
+
+  // One search request per settled query; the cache and the per-minute limit stop a burst of typing becoming a burst of requests.
+  function paletteSearchSoon() {
+    clearTimeout(palette.timer);
+    if (palette.ctrl) { palette.ctrl.abort(); palette.ctrl = null; }
+    var asked = Logic.norm(palette.input.value);
+    if (palette.mode || !paletteServerOk() || asked.length < Logic.SERVER_MIN || asked.length > 100) { palette.server = { q: "", state: "idle", groups: [] }; return; }
+    var hit = palette.cache.get(asked);
+    if (hit) { palette.server = { q: asked, state: "done", groups: hit }; return; }
+    palette.timer = setTimeout(function () {
+      if (!palette.open || Logic.norm(palette.input.value) !== asked) return;
+      if (!palette.limiter.take()) { palette.server = { q: asked, state: "limited", groups: [] }; paletteDraw(); return; }
+      palette.server = { q: asked, state: "loading", groups: [] };
+      paletteDraw();
+      var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+      palette.ctrl = ctrl;
+      fetch(Logic.API + "/hub/search?q=" + encodeURIComponent(asked), { credentials: "include", referrerPolicy: "no-referrer", signal: ctrl ? ctrl.signal : undefined })
+        .then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
+        .then(function (d) {
+          var groups = Logic.cleanGroups(d);
+          palette.cache.set(asked, groups);
+          if (Logic.norm(palette.input.value) === asked) { palette.server = { q: asked, state: "done", groups: groups }; paletteDraw(); }
+        }, function (err) {
+          if (err && err.name === "AbortError") return;
+          if (Logic.norm(palette.input.value) === asked) { palette.server = { q: asked, state: "error", groups: [] }; paletteDraw(); }
+        });
+    }, Logic.DEBOUNCE_MS);
+  }
+
+  function paletteRun(row) {
+    if (!row) return;
+    if (row.ask) { paletteEnterMode(row); return; }
+    paletteClose(false);
+    try { if (typeof row.run === "function") row.run(); } catch (e) { toast("That didn't work. Try again."); }
+  }
+
+  function paletteEnterMode(row) {
+    palette.mode = { kind: row.ask, prompt: row.prompt, title: row.title };
+    palette.input.value = "";
+    palette.input.placeholder = row.title + "…";
+    paletteSearchSoon();
+    paletteDraw();
+  }
+  function paletteLeaveMode() {
+    palette.mode = null;
+    palette.input.value = "";
+    palette.input.placeholder = "Go to a page, run an action, or search";
+    palette.idx = 0;
+    paletteDraw();
+  }
+
+  function paletteSubmit() {
+    if (!palette.mode || palette.busy) return;
+    var req = Logic.capture(palette.mode.kind, palette.input.value);
+    if (!req) { toast(palette.input.value.trim() ? "That is too long to add here." : "Type something first."); return; }
+    palette.busy = true;
+    fetch(Logic.API + req.path, { method: "POST", credentials: "include", referrerPolicy: "no-referrer", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req.body) })
+      .then(function (r) {
+        palette.busy = false;
+        if (r.ok) { paletteClose(true); toast(req.done); return; }
+        toast(r.status === 401 || r.status === 403 ? "Sign in again to add this." : "Couldn't add it. Try again.");
+      }, function () { palette.busy = false; toast("Couldn't reach the server. Try again."); });
+  }
+
+  function paletteBuild() {
+    var back = h("div", "pal-back");
+    back.hidden = true;
+    var box = h("div", "pal");
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-hidden", "true");
+    box.setAttribute("aria-label", "Command palette");
+    var input = h("input", "pal-input");
+    input.type = "text";
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-expanded", "true");
+    input.setAttribute("aria-controls", "pal-list");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-label", "Command palette");
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.placeholder = "Go to a page, run an action, or search";
+    var list = h("div", "pal-list");
+    list.id = "pal-list";
+    list.setAttribute("role", "listbox");
+    var status = h("div", "sr-only");
+    status.setAttribute("aria-live", "polite");
+    var foot = h("div", "pal-foot dim", "↑↓ to move · Enter to choose · Esc to close");
+    box.appendChild(input);
+    box.appendChild(list);
+    box.appendChild(foot);
+    box.appendChild(status);
+    back.appendChild(box);
+    document.body.appendChild(back);
+    palette.el = back; palette.box = box; palette.input = input; palette.list = list; palette.status = status;
+
+    back.addEventListener("mousedown", function (e) { if (e.target === back) paletteClose(true); });
+    input.addEventListener("input", function () { palette.idx = 0; paletteSearchSoon(); paletteDraw(); });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (palette.mode) paletteLeaveMode(); else paletteClose(true); return; }
+      if (e.key === "Tab") { e.preventDefault(); return; }   // the palette is one control: Tab keeps focus in the box
+      if (e.key === "Enter") { e.preventDefault(); if (palette.mode) paletteSubmit(); else paletteRun(palette.items[palette.idx]); return; }
+      if (!palette.items.length || palette.mode) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        palette.idx = (palette.idx + (e.key === "ArrowDown" ? 1 : -1) + palette.items.length) % palette.items.length;
+        paletteMark();
+      } else if (e.key === "Home" || e.key === "End") {
+        if (input.value) return;
+        e.preventDefault();
+        palette.idx = e.key === "Home" ? 0 : palette.items.length - 1;
+        paletteMark();
+      }
+    });
+  }
+
+  function paletteOpen() {
+    if (palette.open) return;
+    if (!palette.el) paletteBuild();
+    palette.open = true;
+    palette.opener = document.activeElement;
+    palette.mode = null; palette.idx = 0; palette.busy = false;
+    palette.server = { q: "", state: "idle", groups: [] };
+    palette.input.value = "";
+    palette.input.placeholder = "Go to a page, run an action, or search";
+    palette.el.hidden = false;
+    palette.box.setAttribute("aria-hidden", "false");
+    document.documentElement.classList.add("pal-open");
+    paletteDraw();
+    palette.input.focus();
+  }
+  function paletteClose(refocus) {
+    if (!palette.open) return;
+    clearTimeout(palette.timer);
+    if (palette.ctrl) { palette.ctrl.abort(); palette.ctrl = null; }
+    palette.open = false;
+    palette.el.hidden = true;
+    palette.box.setAttribute("aria-hidden", "true");
+    document.documentElement.classList.remove("pal-open");
+    if (refocus && palette.opener && palette.opener.focus) { try { palette.opener.focus(); } catch (e) { /* the opener may be gone */ } }
+  }
+
+  // Ctrl+K or Cmd+K anywhere. A page that has its own use for the key (the Notebook's quick find, an editor's link command)
+  // has already handled and cancelled the event by the time it reaches the window, and keeps it.
+  window.addEventListener("keydown", function (e) {
+    if (e.defaultPrevented || e.altKey || e.shiftKey || !(e.ctrlKey || e.metaKey) || String(e.key).toLowerCase() !== "k") return;
+    e.preventDefault();
+    palette.open ? paletteClose(true) : paletteOpen();
+  });
+  if (Theme.who) Theme.who.onChange(function () { if (palette.open && !palette.mode) paletteDraw(); });
 
   // ---- toast ---------------------------------------------------------------
 
@@ -463,7 +854,8 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && settingsOpen && !document.querySelector("[aria-modal='true'][aria-hidden='false']")) closeSettings(); });
   }
 
-  function openSettings() {
+  function openSettings(tabId) {
+    if (typeof tabId === "string" && tabs.some(function (t) { return t.id === tabId; })) activeTab = tabId;
     settingsOpen = true;
     opener = document.activeElement;
     renderSettings();
@@ -637,6 +1029,11 @@
       els.badge.hidden = !n;
     },
     toast: toast,
+    palette: {
+      open: paletteOpen,
+      close: function () { paletteClose(true); },
+      registerCommands: function (fn) { if (typeof fn === "function" && palette.extra.indexOf(fn) === -1) palette.extra.push(fn); }
+    },
     openSettings: openSettings,
     closeSettings: closeSettings,
     controls: { radios: radios, toggle: toggle, svg: svg },
