@@ -60,7 +60,6 @@ section.cert-section { margin-bottom: 40px; }
 .generate-notes-btn:hover:not(:disabled) { background: var(--panel-2); }
 .generate-notes-btn:disabled { opacity: .55; cursor: default; }
 
-.study-footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; max-width: 84ch; }
 
 @media (max-width: 860px) {
   .generate-notes-btn { min-height: 44px; }

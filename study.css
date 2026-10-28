@@ -6,7 +6,6 @@
 .content { max-width: 1040px; }
 .page-head .nb-open { font-weight: 600; align-self: flex-end; font-size: 14px; }
 .page-head .nb-open a { color: var(--accent); text-underline-offset: 3px; }
-.study-footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; max-width: 84ch; }
 .eyebrow { font: 500 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--fg-dim); margin: 0; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg-strong); cursor: pointer; font: 500 14px var(--font-body); text-decoration: none; }
