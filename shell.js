@@ -170,6 +170,7 @@
     { id: "monitor", title: "Monitoring", group: "Work", icon: "pulse", path: "monitoring.html", local: "monitoring.html", ownerOnly: true, perm: "monitoring.view" },
     { id: "incidents", title: "Incidents", group: "Work", icon: "alert", path: "incidents.html", local: "incidents.html", ownerOnly: true, perm: "incidents.view" },
     { id: "reports", title: "Reports", group: "Work", icon: "report", path: "reports.html", local: "reports.html", ownerOnly: true, perm: "reports.view" },
+    { id: "services", title: "Services", group: "Work", icon: "gauge", path: "services.html", local: "services.html", ownerOnly: true, perm: "services.view" },
     { id: "users", title: "Users", group: "Work", icon: "people", path: "users.html", local: "users.html", ownerOnly: true, perm: "users.view" },
     // chatOnly: the Claude chat: the owner, and anyone the Worker says may use it (Theme.who says chat === true,
     // which is true for a guest only while the owner has switched guest chats on). Hidden until that is known.
@@ -192,6 +193,7 @@
     pulse: '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>',
     alert: '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
     report: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 17v-3M12 17v-6M15 17v-4"/>',
+    gauge: '<path d="M4 18a8 8 0 1116 0"/><path d="M12 18l4-6"/><path d="M12 6v2M6.3 8.3l1.4 1.4M17.7 8.3l-1.4 1.4"/>',
     shield: '<path d="M12 3l7 3v5.5c0 4.4-3 8.2-7 9.5-4-1.3-7-5.1-7-9.5V6z"/><path d="M12 8v4.5M12 15.5v.01"/>',
     note: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
     book: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',
@@ -245,6 +247,7 @@
     if (/(^|\/)monitoring\.html$/.test(location.pathname)) return "monitor";
     if (/(^|\/)incidents\.html$/.test(location.pathname)) return "incidents";
     if (/(^|\/)reports\.html$/.test(location.pathname)) return "reports";
+    if (/(^|\/)services\.html$/.test(location.pathname)) return "services";
     return "overview";
   }
 
