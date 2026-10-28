@@ -157,7 +157,6 @@ kbd { font: 12px var(--font-mono); padding: 1px 6px; border: 1px solid var(--lin
 }
 @media (prefers-reduced-motion: no-preference) { .nb-row, .nb-tool { transition: background .12s; } }
 
-.study-footer { margin-top: 28px; font-size: 12.5px; max-width: 760px; }
 .cert-empty-note { color: var(--fg-dim); }
 
 /* Very wide screens: a roomier notes list; the editor and preview take the rest. */

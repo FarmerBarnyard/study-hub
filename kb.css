@@ -7,7 +7,6 @@
 
 .kb[hidden] { display: none; }
 .kb-view { display: flex; flex-direction: column; gap: 18px; }
-.study-footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; max-width: 84ch; color: var(--fg-dim); }
 #kb-dialog-body { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; overflow-y: auto; max-height: 60vh; }
 .kb-loading { color: var(--fg-dim); padding: 24px 4px; }
 .kb-error { color: var(--alert); }
@@ -182,7 +181,7 @@
 @media (prefers-reduced-motion: reduce) { .kb-card { transition: none; } .kb-card:hover { transform: none; } }
 
 @media print {
-  .side, .top, .kb-actions, .kb-toc, .kb-progress, .kb-more, .study-footer, .nb-copy, #bg { display: none !important; }
+  .side, .top, .kb-actions, .kb-toc, .kb-progress, .kb-more, .nb-copy, #bg { display: none !important; }
   .kb-banner { background: none; border: 0; padding: 0; }
   .kb-banner::after { display: none; }
   .kb-layout { display: block; }
