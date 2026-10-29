@@ -165,7 +165,7 @@
     pii_in_article: "This article contains personal details that would be public on the run page. Tick the box to confirm that is fine.",
     article_hidden: "This article is hidden. Show it again before making a run link.",
     article_runs_full: "This procedure already has 20 live run links. Turn one off first.",
-    author_runs_full: "You already have 60 live run links. Turn some off first.",
+    author_runs_full: "The author of this procedure already has 60 live run links. Turn some off first.",
     runs_full: "The site is at its limit of run links. Turn some off first.",
     too_many_steps: "A run can have up to 400 steps.",
     step_too_long: "One of the steps is too long for a run (1,200 characters at most).",
@@ -816,7 +816,8 @@
       var edit = el("a", "btn", tools, "Edit");
       edit.href = "#/edit/" + a.id;
     }
-    if ((data.canEdit || data.canModerate) && isSop(a) && !a.hidden) {
+    // Run links are for the owner and anyone who may publish, on any procedure, not only their own (the Worker says so in /kb/me).
+    if ((data.canEdit || data.canModerate || (state.me && state.me.canRunLinks === true)) && isSop(a) && !a.hidden) {
       btn("Run links", "btn kb-primary", tools, function () { openRunLinks(a); });
     }
     if (data.canEdit || data.canModerate) {

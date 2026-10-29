@@ -113,7 +113,7 @@
   }
   var FATAL = { not_found: 1, run_revoked: 1, run_expired: 1 };
 
-  // ---- sending an email (the owner only; the Worker: /kb/run/send) ----
+  // ---- sending an email (the owner and people who may publish; the Worker: /kb/run/send) ----
 
   // How many addresses are in the box (split on commas, semicolons and line breaks, without repeats).
   function countAddresses(text) {
@@ -139,18 +139,22 @@
     no_recipients: "Add at least one address to send to.",
     recipient_invalid: "One of the addresses isn't valid.",
     too_many_recipients: "That's more than 25 addresses. Split it into two sends.",
-    send_limit: "Today's sending allowance is used up.",
+    send_limit: "Today's sending allowance for everyone is used up. It starts again tomorrow.",
     already_sent: "This email was already sent.",
     send_not_configured: "Sending isn't set up yet.",
     run_revoked: "This link has been switched off.",
     run_expired: "This link has expired.",
-    forbidden: "Only the owner can send from here.",
+    forbidden: "Only people who can publish in the Knowledgebase can send from here.",
     unauthenticated: "You are signed out. Sign in to the study site again, then reload this page.",
   };
   function sendErrorText(code, json, status) {
     json = json || {};
     if (code === "details_missing" && json.details && json.details.length) return "Fill in these details first: " + json.details.join(", ") + ".";
     if (code === "send_failed") return SEND_FAILED[json.reason] || "The email couldn't be sent. Try again in a moment.";
+    if (code === "send_limit_person") {
+      var left = typeof json.left === "number" ? json.left : 0;
+      return "That would go over your own limit for today. " + (left > 0 ? "You can send to " + left + (left === 1 ? " more address" : " more addresses") + " today." : "You have no addresses left today.") + " It starts again tomorrow.";
+    }
     if (SEND_ERRORS[code]) return SEND_ERRORS[code];
     if (status === 0) return "Couldn't reach the server. Check your connection.";
     return "The email couldn't be sent. Try again in a moment.";
@@ -317,8 +321,9 @@
     buildSend(view, card);
   }
 
-  // The owner's Send panel under an email. Hidden for everyone else: it only appears once the Worker says this
-  // browser is signed in as the owner and the shared mailbox is set up (checkSend).
+  // The Send panel under an email. Hidden for everyone else: it only appears once the Worker says this browser is
+  // signed in as the owner or someone who may publish (checkSend). If the shared mailbox is not set up yet the panel
+  // says so instead of offering a button.
   function buildSend(view, card) {
     var box = el("div", "run-send", card);
     box.hidden = true;
@@ -342,21 +347,31 @@
       var n = countAddresses(to.value);
       if (!n) { status.textContent = sendErrorText("no_recipients"); status.className = "run-send-status run-bad"; return; }
       var again = !!(run.sent && run.sent[view.email.id]);
-      sureText.textContent = (again ? "This was already sent. Send it again to " : "Send to ") + n + (n === 1 ? " address" : " addresses") + " from " + sendInfo.from + "? ";
+      sureText.textContent = (again ? "This was already sent. Send it again to " : "Send to ") + n + (n === 1 ? " address" : " addresses") + " from " + sendInfo.from + "? " + (sendInfo.perPerson > 0 ? "(You can send to up to " + sendInfo.perPerson + " addresses a day.) " : "");
       sure.hidden = false; go.hidden = true;
       yes.onclick = function () { sure.hidden = true; go.hidden = false; doSend(view, again); };
     });
   }
 
-  var sendInfo = null;     // { from } once the Worker says this browser may send
+  var sendInfo = null;     // { from, perPerson } once the Worker says this browser may send and sending is set up
 
   function checkSend() {
     return fetch("https://api.barnyard.site/kb/run/send-status", { credentials: "include", cache: "no-store", referrerPolicy: "no-referrer" }).then(function (r) {
       if (r.status !== 200) return null;
       return r.json().catch(function () { return null; });
     }, function () { return null; }).then(function (j) {
-      if (!j || !j.canSend) return;
-      sendInfo = { from: j.from };
+      if (!j) return;
+      if (!j.canSend) {
+        // allowed to send, but the shared mailbox is not set up: say so rather than show nothing
+        mailViews.forEach(function (v) {
+          if (!v.send) return;
+          v.send.box.hidden = false; v.send.go.hidden = true; v.send.to.parentNode.hidden = true;
+          v.send.status.textContent = sendErrorText("send_not_configured") + " Ask the owner to set up the sending mailbox.";
+          v.send.status.className = "run-send-status";
+        });
+        return;
+      }
+      sendInfo = { from: j.from, perPerson: typeof j.perPerson === "number" ? j.perPerson : 0 };
       mailViews.forEach(function (v) { if (v.send) v.send.box.hidden = false; });
       paintMail();
     });
