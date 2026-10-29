@@ -109,4 +109,27 @@ test("send failures are explained in plain words and never repeat what the serve
   assert.ok(!/AADSTS|stack/.test(r.sendErrorText("send_failed", { reason: "weird", message: "AADSTS70011" })));
 });
 
+test("the two daily sending limits are told apart, and a refusal names who can send", function () {
+  assert.ok(/for everyone is used up/.test(r.sendErrorText("send_limit", { left: 3 })));
+  assert.ok(/own limit for today/.test(r.sendErrorText("send_limit_person", { left: 3 })));
+  assert.ok(/send to 3 more addresses today/.test(r.sendErrorText("send_limit_person", { left: 3 })));
+  assert.ok(/send to 1 more address today/.test(r.sendErrorText("send_limit_person", { left: 1 })));
+  assert.ok(/no addresses left today/.test(r.sendErrorText("send_limit_person", { left: 0 })));
+  assert.ok(/no addresses left today/.test(r.sendErrorText("send_limit_person", {})), "no number is treated as none left");
+  assert.ok(/starts again tomorrow/.test(r.sendErrorText("send_limit_person", { left: 3 })));
+  assert.ok(/Only people who can publish/.test(r.sendErrorText("forbidden")));
+  assert.ok(!/owner can send/.test(r.sendErrorText("forbidden")), "it is no longer owner only");
+  assert.ok(/isn't set up yet/.test(r.sendErrorText("send_not_configured")));
+});
+
+test("the Run links button follows the Worker's canRunLinks and the page's own copy", function () {
+  var fs = require("fs"), path = require("path");
+  var kb = fs.readFileSync(path.join(__dirname, "..", "kb.js"), "utf8");
+  assert.ok(/state\.me && state\.me\.canRunLinks === true/.test(kb), "the button is offered to anyone the Worker says may use run links");
+  assert.ok(/isSop\(a\) && !a\.hidden\)/.test(kb), "still only on a visible procedure");
+  var run = fs.readFileSync(path.join(__dirname, "..", "run.js"), "utf8");
+  assert.ok(/perPerson/.test(run), "the send panel knows the person's daily allowance");
+  assert.ok(!/the owner only/.test(run), "no leftover owner-only wording");
+});
+
 console.log(passed + " passed");
