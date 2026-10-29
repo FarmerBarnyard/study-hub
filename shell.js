@@ -171,6 +171,9 @@
     { id: "incidents", title: "Incidents", group: "Work", icon: "alert", path: "incidents.html", local: "incidents.html", ownerOnly: true, perm: "incidents.view" },
     { id: "reports", title: "Reports", group: "Work", icon: "report", path: "reports.html", local: "reports.html", ownerOnly: true, perm: "reports.view" },
     { id: "services", title: "Services", group: "Work", icon: "gauge", path: "services.html", local: "services.html", ownerOnly: true, perm: "services.view" },
+    // The Microsoft 365 page (m365.html): licences, MFA, stale accounts, admin roles, Conditional Access, secure score. The Worker's
+    // area is "m365" (an owner area, like Services).
+    { id: "m365", title: "Microsoft 365", group: "Work", icon: "tenant", path: "m365.html", local: "m365.html", ownerOnly: true, perm: "m365.view", keywords: "licences licenses mfa guests admins roles conditional access secure score entra tenant accounts stale" },
     // The dependency map (map.html): no perm on purpose. The Worker has no area for it (its /reg/ routes are the owner's alone) and the
     // owner is never capped, so there is nothing for the Users page to take away. keywords: extra words the palette matches.
     { id: "map", title: "Blast radius", group: "Work", icon: "blast", path: "map.html", local: "map.html", ownerOnly: true, keywords: "dependencies dependency map links weakest impact" },
@@ -201,6 +204,7 @@
     note: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
     book: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',
     map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+    tenant: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7.5h2M13 7.5h2M9 11.5h2M13 11.5h2M9 15.5h2M13 15.5h2"/>',
     blast: '<circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="6"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
     chart: '<path d="M3 20h18"/><path d="M5 15l4-5 4 3 6-8"/>',
@@ -253,6 +257,7 @@
     if (/(^|\/)reports\.html$/.test(location.pathname)) return "reports";
     if (/(^|\/)services\.html$/.test(location.pathname)) return "services";
     if (/(^|\/)map\.html$/.test(location.pathname)) return "map";
+    if (/(^|\/)m365\.html$/.test(location.pathname)) return "m365";
     return "overview";
   }
 
