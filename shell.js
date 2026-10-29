@@ -167,7 +167,9 @@
     { id: "vuln", title: "Vulnerabilities", group: "Work", icon: "shield", path: "vulnerabilities.html", local: "vulnerabilities.html", perm: "vuln.view" },
     // ownerOnly: shown only to the hub owner (Theme.who says owner === true), and hidden until that is known.
     { id: "calendar", title: "Calendar", group: "Work", icon: "calendar", path: "calendar.html", local: "calendar.html", ownerOnly: true, perm: "calendar.view" },
-    { id: "monitor", title: "Monitoring", group: "Work", icon: "pulse", path: "monitoring.html", local: "monitoring.html", ownerOnly: true, perm: "monitoring.view" },
+    // Monitoring is no longer owner only: everyone else has their own space on the same page, and the owner's Users tab can take
+    // it away per person (perm), like the Ops board's link.
+    { id: "monitor", title: "Monitoring", group: "Work", icon: "pulse", path: "monitoring.html", local: "monitoring.html", perm: "monitoring.view" },
     { id: "incidents", title: "Incidents", group: "Work", icon: "alert", path: "incidents.html", local: "incidents.html", ownerOnly: true, perm: "incidents.view" },
     { id: "reports", title: "Reports", group: "Work", icon: "report", path: "reports.html", local: "reports.html", ownerOnly: true, perm: "reports.view" },
     { id: "services", title: "Services", group: "Work", icon: "gauge", path: "services.html", local: "services.html", ownerOnly: true, perm: "services.view" },
