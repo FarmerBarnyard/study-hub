@@ -167,7 +167,9 @@
     { id: "vuln", title: "Vulnerabilities", group: "Work", icon: "shield", path: "vulnerabilities.html", local: "vulnerabilities.html", perm: "vuln.view" },
     // ownerOnly: shown only to the hub owner (Theme.who says owner === true), and hidden until that is known.
     { id: "calendar", title: "Calendar", group: "Work", icon: "calendar", path: "calendar.html", local: "calendar.html", ownerOnly: true, perm: "calendar.view" },
-    { id: "monitor", title: "Monitoring", group: "Work", icon: "pulse", path: "monitoring.html", local: "monitoring.html", ownerOnly: true, perm: "monitoring.view" },
+    // Monitoring is no longer owner only: everyone else has their own space on the same page, and the owner's Users tab can take
+    // it away per person (perm), like the Ops board's link.
+    { id: "monitor", title: "Monitoring", group: "Work", icon: "pulse", path: "monitoring.html", local: "monitoring.html", perm: "monitoring.view" },
     { id: "incidents", title: "Incidents", group: "Work", icon: "alert", path: "incidents.html", local: "incidents.html", ownerOnly: true, perm: "incidents.view" },
     { id: "reports", title: "Reports", group: "Work", icon: "report", path: "reports.html", local: "reports.html", ownerOnly: true, perm: "reports.view" },
     { id: "services", title: "Services", group: "Work", icon: "gauge", path: "services.html", local: "services.html", ownerOnly: true, perm: "services.view" },
@@ -177,6 +179,7 @@
     // The dependency map (map.html): no perm on purpose. The Worker has no area for it (its /reg/ routes are the owner's alone) and the
     // owner is never capped, so there is nothing for the Users page to take away. keywords: extra words the palette matches.
     { id: "map", title: "Blast radius", group: "Work", icon: "blast", path: "map.html", local: "map.html", ownerOnly: true, keywords: "dependencies dependency map links weakest impact" },
+    { id: "release", title: "Release board", group: "Work", icon: "branch", path: "release.html", local: "release.html", ownerOnly: true, perm: "release.view", keywords: "releases deploys deployments ci tests pull requests rollback main red github" },
     { id: "users", title: "Users", group: "Work", icon: "people", path: "users.html", local: "users.html", ownerOnly: true, perm: "users.view" },
     // chatOnly: the Claude chat: the owner, and anyone the Worker says may use it (Theme.who says chat === true,
     // which is true for a guest only while the owner has switched guest chats on). Hidden until that is known.
@@ -206,6 +209,7 @@
     map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
     tenant: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7.5h2M13 7.5h2M9 11.5h2M13 11.5h2M9 15.5h2M13 15.5h2"/>',
     blast: '<circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="6"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2"/>',
+    branch: '<circle cx="6" cy="5.5" r="2.5"/><circle cx="6" cy="18.5" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M6 8v8M18 11.5c0 3.5-5 3-10.5 5.5"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
     chart: '<path d="M3 20h18"/><path d="M5 15l4-5 4 3 6-8"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
@@ -258,6 +262,7 @@
     if (/(^|\/)services\.html$/.test(location.pathname)) return "services";
     if (/(^|\/)map\.html$/.test(location.pathname)) return "map";
     if (/(^|\/)m365\.html$/.test(location.pathname)) return "m365";
+    if (/(^|\/)release\.html$/.test(location.pathname)) return "release";
     return "overview";
   }
 
