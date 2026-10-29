@@ -173,6 +173,9 @@
     { id: "incidents", title: "Incidents", group: "Work", icon: "alert", path: "incidents.html", local: "incidents.html", ownerOnly: true, perm: "incidents.view" },
     { id: "reports", title: "Reports", group: "Work", icon: "report", path: "reports.html", local: "reports.html", ownerOnly: true, perm: "reports.view" },
     { id: "services", title: "Services", group: "Work", icon: "gauge", path: "services.html", local: "services.html", ownerOnly: true, perm: "services.view" },
+    // The dependency map (map.html): no perm on purpose. The Worker has no area for it (its /reg/ routes are the owner's alone) and the
+    // owner is never capped, so there is nothing for the Users page to take away. keywords: extra words the palette matches.
+    { id: "map", title: "Blast radius", group: "Work", icon: "blast", path: "map.html", local: "map.html", ownerOnly: true, keywords: "dependencies dependency map links weakest impact" },
     { id: "users", title: "Users", group: "Work", icon: "people", path: "users.html", local: "users.html", ownerOnly: true, perm: "users.view" },
     // chatOnly: the Claude chat: the owner, and anyone the Worker says may use it (Theme.who says chat === true,
     // which is true for a guest only while the owner has switched guest chats on). Hidden until that is known.
@@ -200,6 +203,7 @@
     note: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
     book: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',
     map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+    blast: '<circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="6"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
     chart: '<path d="M3 20h18"/><path d="M5 15l4-5 4 3 6-8"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
@@ -250,6 +254,7 @@
     if (/(^|\/)incidents\.html$/.test(location.pathname)) return "incidents";
     if (/(^|\/)reports\.html$/.test(location.pathname)) return "reports";
     if (/(^|\/)services\.html$/.test(location.pathname)) return "services";
+    if (/(^|\/)map\.html$/.test(location.pathname)) return "map";
     return "overview";
   }
 
@@ -480,7 +485,7 @@
       if (mayUse("ops.view")) list.push({ group: "Add", title: "Add an Ops proposal", hint: "Ops board", keywords: "idea suggestion new", ask: "proposal", prompt: "Describe the idea. The first line is the title. Press Enter to add it." });
     }
     PAGES.filter(pageAllowed).forEach(function (p) {
-      list.push({ group: "Go to", title: p.title, hint: p.group || "Page", keywords: "open " + p.id, run: function () { location.href = pageHref(p); } });
+      list.push({ group: "Go to", title: p.title, hint: p.group || "Page", keywords: "open " + p.id + (p.keywords ? " " + p.keywords : ""), run: function () { location.href = pageHref(p); } });
     });
     list.push({ group: "Actions", title: Theme.isDark() ? "Switch to light mode" : "Switch to dark mode", hint: "Appearance", keywords: "theme mode dark light", run: function () { Theme.set({ mode: Theme.isDark() ? "light" : "dark" }); } });
     list.push({ group: "Actions", title: Theme.get().density === "compact" ? "Use comfortable spacing" : "Use compact spacing", hint: "Appearance", keywords: "density", run: function () { Theme.set({ density: Theme.get().density === "compact" ? "comfortable" : "compact" }); } });
