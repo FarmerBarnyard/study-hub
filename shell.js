@@ -170,16 +170,18 @@
     // Monitoring is no longer owner only: everyone else has their own space on the same page, and the owner's Users tab can take
     // it away per person (perm), like the Ops board's link.
     { id: "monitor", title: "Monitoring", group: "Work", icon: "pulse", path: "monitoring.html", local: "monitoring.html", perm: "monitoring.view" },
-    { id: "incidents", title: "Incidents", group: "Work", icon: "alert", path: "incidents.html", local: "incidents.html", ownerOnly: true, perm: "incidents.view" },
-    { id: "reports", title: "Reports", group: "Work", icon: "report", path: "reports.html", local: "reports.html", ownerOnly: true, perm: "reports.view" },
-    { id: "services", title: "Services", group: "Work", icon: "gauge", path: "services.html", local: "services.html", ownerOnly: true, perm: "services.view" },
+    // nav: false: not in the menu, but still found by the search box and Ctrl+K. Services, Incidents, Reports and the Release board are
+    // tabs of the Monitoring page now (owner only, each with its own permission); `hint` is what the search shows beside the name.
+    { id: "services", title: "Services", group: "Work", icon: "gauge", path: "monitoring.html#services", local: "monitoring.html#services", ownerOnly: true, perm: "services.view", nav: false, hint: "Monitoring", keywords: "uptime targets capacity forecast security levels" },
+    { id: "incidents", title: "Incidents", group: "Work", icon: "alert", path: "monitoring.html#incidents", local: "monitoring.html#incidents", ownerOnly: true, perm: "incidents.view", nav: false, hint: "Monitoring", keywords: "incident room outage open close review postmortem" },
+    { id: "reports", title: "Reports", group: "Work", icon: "report", path: "monitoring.html#reports", local: "monitoring.html#reports", ownerOnly: true, perm: "reports.view", nav: false, hint: "Monitoring", keywords: "monthly it report committee" },
+    { id: "release", title: "Release board", group: "Work", icon: "branch", path: "monitoring.html#release", local: "monitoring.html#release", ownerOnly: true, perm: "release.view", nav: false, hint: "Monitoring", keywords: "releases deploys deployments ci tests pull requests rollback main red github" },
     // The Microsoft 365 page (m365.html): licences, MFA, stale accounts, admin roles, Conditional Access, secure score. The Worker's
     // area is "m365" (an owner area, like Services).
     { id: "m365", title: "Microsoft 365", group: "Work", icon: "tenant", path: "m365.html", local: "m365.html", ownerOnly: true, perm: "m365.view", keywords: "licences licenses mfa guests admins roles conditional access secure score entra tenant accounts stale" },
     // The dependency map (map.html): no perm on purpose. The Worker has no area for it (its /reg/ routes are the owner's alone) and the
     // owner is never capped, so there is nothing for the Users page to take away. keywords: extra words the palette matches.
     { id: "map", title: "Blast radius", group: "Work", icon: "blast", path: "map.html", local: "map.html", ownerOnly: true, keywords: "dependencies dependency map links weakest impact" },
-    { id: "release", title: "Release board", group: "Work", icon: "branch", path: "release.html", local: "release.html", ownerOnly: true, perm: "release.view", keywords: "releases deploys deployments ci tests pull requests rollback main red github" },
     { id: "canvas", title: "Canvas", group: "Work", icon: "canvas", path: "canvas.html", local: "canvas.html", ownerOnly: true, perm: "canvas.view", keywords: "whiteboard diagram board sketch draw mind map network notes" },
     // The Academy (academy.html): courses made from Knowledgebase articles, quizzes and spaced review. An owner area in the Worker
     // ("academy"), so the Users page can take it away like Reports.
@@ -266,12 +268,8 @@
     if (/(^|\/)vulnerabilities\.html$/.test(location.pathname)) return "vuln";
     if (/(^|\/)calendar\.html$/.test(location.pathname)) return "calendar";
     if (/(^|\/)monitoring\.html$/.test(location.pathname)) return "monitor";
-    if (/(^|\/)incidents\.html$/.test(location.pathname)) return "incidents";
-    if (/(^|\/)reports\.html$/.test(location.pathname)) return "reports";
-    if (/(^|\/)services\.html$/.test(location.pathname)) return "services";
     if (/(^|\/)map\.html$/.test(location.pathname)) return "map";
     if (/(^|\/)m365\.html$/.test(location.pathname)) return "m365";
-    if (/(^|\/)release\.html$/.test(location.pathname)) return "release";
     if (/(^|\/)academy\.html$/.test(location.pathname)) return "academy";
     if (/(^|\/)kitchen\.html$/.test(location.pathname)) return "kitchen";
     return "overview";
@@ -346,6 +344,7 @@
     nav.setAttribute("aria-label", "Main");
     var lastGroup = null;
     PAGES.forEach(function (p) {
+      if (p.nav === false) return;   // found by the search box and Ctrl+K only
       if (p.group && p.group !== lastGroup) { nav.appendChild(h("div", "nav-group", p.group)); lastGroup = p.group; }
       var a = h("a");
       a.href = pageHref(p);
@@ -459,7 +458,7 @@
       }
       if (pages.length) {
         box.appendChild(h("div", "grp", "Pages"));
-        pages.forEach(function (p) { box.appendChild(option(p.title, "Page", function () { location.href = pageHref(p); })); });
+        pages.forEach(function (p) { box.appendChild(option(p.title, p.hint || "Page", function () { location.href = pageHref(p); })); });
       }
       if (found.length) {
         box.appendChild(h("div", "grp", "Board items"));
@@ -504,7 +503,7 @@
       if (mayUse("ops.view")) list.push({ group: "Add", title: "Add an Ops proposal", hint: "Ops board", keywords: "idea suggestion new", ask: "proposal", prompt: "Describe the idea. The first line is the title. Press Enter to add it." });
     }
     PAGES.filter(pageAllowed).forEach(function (p) {
-      list.push({ group: "Go to", title: p.title, hint: p.group || "Page", keywords: "open " + p.id + (p.keywords ? " " + p.keywords : ""), run: function () { location.href = pageHref(p); } });
+      list.push({ group: "Go to", title: p.title, hint: p.hint || p.group || "Page", keywords: "open " + p.id + (p.keywords ? " " + p.keywords : ""), run: function () { location.href = pageHref(p); } });
     });
     list.push({ group: "Actions", title: Theme.isDark() ? "Switch to light mode" : "Switch to dark mode", hint: "Appearance", keywords: "theme mode dark light", run: function () { Theme.set({ mode: Theme.isDark() ? "light" : "dark" }); } });
     list.push({ group: "Actions", title: Theme.get().density === "compact" ? "Use comfortable spacing" : "Use compact spacing", hint: "Appearance", keywords: "density", run: function () { Theme.set({ density: Theme.get().density === "compact" ? "comfortable" : "compact" }); } });
