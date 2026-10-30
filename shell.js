@@ -180,6 +180,9 @@
     // owner is never capped, so there is nothing for the Users page to take away. keywords: extra words the palette matches.
     { id: "map", title: "Blast radius", group: "Work", icon: "blast", path: "map.html", local: "map.html", ownerOnly: true, keywords: "dependencies dependency map links weakest impact" },
     { id: "release", title: "Release board", group: "Work", icon: "branch", path: "release.html", local: "release.html", ownerOnly: true, perm: "release.view", keywords: "releases deploys deployments ci tests pull requests rollback main red github" },
+    // The Academy (academy.html): courses made from Knowledgebase articles, quizzes and spaced review. An owner area in the Worker
+    // ("academy"), so the Users page can take it away like Reports.
+    { id: "academy", title: "Academy", group: "Work", icon: "academy", path: "academy.html", local: "academy.html", ownerOnly: true, perm: "academy.view", keywords: "courses lessons quiz quizzes training learn study review revision knowledgebase articles" },
     { id: "users", title: "Users", group: "Work", icon: "people", path: "users.html", local: "users.html", ownerOnly: true, perm: "users.view" },
     // chatOnly: the Claude chat: the owner, and anyone the Worker says may use it (Theme.who says chat === true,
     // which is true for a guest only while the owner has switched guest chats on). Hidden until that is known.
@@ -210,6 +213,7 @@
     tenant: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7.5h2M13 7.5h2M9 11.5h2M13 11.5h2M9 15.5h2M13 15.5h2"/>',
     blast: '<circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="6"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2"/>',
     branch: '<circle cx="6" cy="5.5" r="2.5"/><circle cx="6" cy="18.5" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M6 8v8M18 11.5c0 3.5-5 3-10.5 5.5"/>',
+    academy: '<path d="M2.5 9.5L12 5l9.5 4.5L12 14z"/><path d="M6.5 11.8V16c1.4 1.4 3.4 2 5.5 2s4.1-.6 5.5-2v-4.2"/><path d="M21.5 9.5V15"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
     chart: '<path d="M3 20h18"/><path d="M5 15l4-5 4 3 6-8"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
@@ -263,6 +267,7 @@
     if (/(^|\/)map\.html$/.test(location.pathname)) return "map";
     if (/(^|\/)m365\.html$/.test(location.pathname)) return "m365";
     if (/(^|\/)release\.html$/.test(location.pathname)) return "release";
+    if (/(^|\/)academy\.html$/.test(location.pathname)) return "academy";
     return "overview";
   }
 
