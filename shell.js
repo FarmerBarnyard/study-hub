@@ -180,6 +180,7 @@
     // owner is never capped, so there is nothing for the Users page to take away. keywords: extra words the palette matches.
     { id: "map", title: "Blast radius", group: "Work", icon: "blast", path: "map.html", local: "map.html", ownerOnly: true, keywords: "dependencies dependency map links weakest impact" },
     { id: "release", title: "Release board", group: "Work", icon: "branch", path: "release.html", local: "release.html", ownerOnly: true, perm: "release.view", keywords: "releases deploys deployments ci tests pull requests rollback main red github" },
+    { id: "canvas", title: "Canvas", group: "Work", icon: "canvas", path: "canvas.html", local: "canvas.html", ownerOnly: true, perm: "canvas.view", keywords: "whiteboard diagram board sketch draw mind map network notes" },
     // The Academy (academy.html): courses made from Knowledgebase articles, quizzes and spaced review. An owner area in the Worker
     // ("academy"), so the Users page can take it away like Reports.
     { id: "academy", title: "Academy", group: "Work", icon: "academy", path: "academy.html", local: "academy.html", ownerOnly: true, perm: "academy.view", keywords: "courses lessons quiz quizzes training learn study review revision knowledgebase articles" },
@@ -215,6 +216,7 @@
     tenant: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7.5h2M13 7.5h2M9 11.5h2M13 11.5h2M9 15.5h2M13 15.5h2"/>',
     blast: '<circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="6"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2"/>',
     branch: '<circle cx="6" cy="5.5" r="2.5"/><circle cx="6" cy="18.5" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M6 8v8M18 11.5c0 3.5-5 3-10.5 5.5"/>',
+    canvas: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h3"/><circle cx="16.5" cy="14.5" r="2.5"/>',
     academy: '<path d="M2.5 9.5L12 5l9.5 4.5L12 14z"/><path d="M6.5 11.8V16c1.4 1.4 3.4 2 5.5 2s4.1-.6 5.5-2v-4.2"/><path d="M21.5 9.5V15"/>',
     kitchen: '<path d="M7 3v7M4.5 3v4.5a2.5 2.5 0 005 0V3M7 10v11"/><path d="M17 21V3c-2.5 1.5-3.5 4.5-3.5 8H17"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
