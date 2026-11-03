@@ -247,3 +247,13 @@ test("the certification list and the notes each have a page of their own, with t
 });
 
 console.log("\n" + passed + " passed");
+
+test("a part queued for the owner's own Claude is asked about until it is written or has failed", function () {
+  var js = fs.readFileSync(path.join(__dirname, "..", "study.js"), "utf8").replace(/\/\/.*$/gm, "");
+  assert.ok(/\/study\/job/.test(js) && /waitForJob/.test(js) && /JOB_POLL_MS/.test(js) && /JOB_WAIT_MS/.test(js), "queued parts are polled, with a limit");
+  assert.ok(/r\.json\.queued === true/.test(js), "only a queued answer starts the wait; an API-written part is used as it was");
+  assert.match(S.reasonText("runner_offline"), /runner/);
+  assert.strictEqual(S.FATAL_REASONS.runner_offline, true, "if the runner is not running, the other parts would fail too");
+  assert.match(S.errorText("runner_offline", 503).text, /runner/);
+  assert.match(S.reasonText("auth"), /ANTHROPIC_API_KEY/, "the API-key advice is still there");
+});
