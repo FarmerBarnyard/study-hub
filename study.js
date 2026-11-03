@@ -24,6 +24,8 @@
   var API = "https://api.barnyard.site";
   var STEP_TIMEOUT_MS = 30000;      // planning or reading one page
   var MAKE_TIMEOUT_MS = 300000;     // writing one part can take a few minutes
+  var JOB_POLL_MS = 5000;           // a part written by the owner's own Claude (queued on the server): how often to ask
+  var JOB_WAIT_MS = 40 * 60 * 1000; // ... and how long to wait for it before giving up on this page's side
   var READ_AT_ONCE = 4;             // pages read at the same time
 
   // The tabs of a lab, in order, and which kind of material each one needs.
@@ -69,6 +71,8 @@
     source_unreachable: "That page couldn’t be reached right now. Try again in a moment.",
     daily_limit: "You’ve used today’s allowance. It resets tomorrow.",
     generation_failed: "Claude couldn’t make anything from that page this time. Try again.",
+    runner_offline: "Your Claude runner on the server isn’t running, so nothing could be written. Start it, or ask Claude Code to switch Study back to the API key.",
+    queue_full: "Too many parts are already waiting for your Claude. Wait for them to finish, then try again.",
     recent_sign_in_required: "For safety this needs a recent sign-in. Log in again, then retry.",
     secret_detected: "That looks like it contains a password or key, so it was not saved."
   };
@@ -86,7 +90,8 @@
   var REASONS = {
     rate_limited: "Claude is limiting how much this account can send a minute. Wait a minute or two.",
     busy: "Claude is busy right now. Try again in a minute.",
-    auth: "Claude refused the server's API key. The ANTHROPIC_API_KEY secret on the Worker needs checking.",
+    auth: "Claude refused the server’s sign-in. If Study runs on your own Claude, the runner’s login (CLAUDE_CODE_OAUTH_TOKEN) needs renewing; otherwise check the ANTHROPIC_API_KEY secret on the Worker.",
+    runner_offline: "Your Claude runner on the server didn’t pick this up. Check it is running, then try that part again.",
     credit: "The Anthropic account is out of credit. Add credit in the Anthropic console, then try again.",
     model: "The Claude model the server asks for isn’t available to its API key.",
     too_long: "That material is too long for Claude in one go. Try a smaller link: a module or a learning path.",
@@ -97,7 +102,7 @@
     bad_request: "Claude rejected the request. Try again; if it keeps happening, tell Claude Code."
   };
   // Reasons that mean the other parts would fail the same way, so there is no point trying them.
-  var FATAL_REASONS = { auth: true, credit: true, model: true, too_long: true, bad_request: true };
+  var FATAL_REASONS = { auth: true, credit: true, model: true, too_long: true, bad_request: true, runner_offline: true };
   function reasonText(reason) { return REASONS[reason] || "Claude couldn’t write that part. Try again."; }
 
   function letter(i) { return "abcd".charAt(i); }
@@ -890,9 +895,33 @@
     var body = { id: id, kind: kind };
     if (kind === "notes") body.part = part || 1;
     return call("POST", "/study/make", body, MAKE_TIMEOUT_MS).then(function (r) {
-      if (r.status === 200 && r.json && r.json.ok === true) return r.json;
+      if (r.status === 200 && r.json && r.json.ok === true) {
+        // Your own Claude on the server writes it: the part is queued, and this asks until it is done.
+        if (r.json.queued === true && typeof r.json.job === "string") { onRunner = true; return waitForJob(r.json.job, kind); }
+        return r.json;
+      }
       return { ok: false, error: (r.json && r.json.error) || "generation_failed", reason: r.json && r.json.reason, status: r.status, kind: kind };
     });
+  }
+
+  // True once a part has been queued for the owner's own Claude, so the page can say they are written one at a time.
+  var onRunner = false;
+  function pause(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+
+  // Ask how a queued part is getting on until it is written or has failed. -> the same answer as an API-written part.
+  function waitForJob(job, kind) {
+    var started = Date.now();
+    function ask() {
+      return call("POST", "/study/job", { job: job }, STEP_TIMEOUT_MS).then(function (r) {
+        var j = r.json || {};
+        if (r.status === 200 && j.ok === true && j.status === "done") return j;
+        if (r.status === 200 && j.status === "failed") return { ok: false, error: "generation_failed", reason: j.reason, kind: kind };
+        if (r.status === 401 || r.status === 403 || r.status === 404) return { ok: false, error: j.error || "generation_failed", status: r.status, kind: kind };
+        if (Date.now() - started > JOB_WAIT_MS) return { ok: false, error: "generation_failed", reason: "timeout", kind: kind };
+        return pause(JOB_POLL_MS).then(ask);          // waiting, being written, or a hiccup on the way
+      });
+    }
+    return ask();
   }
 
   // Add a missing part (or some passes of the notes) to the lab that is open, then open the saved lab again.
@@ -968,7 +997,7 @@
         if (rd.fatal) { stop(rd.fatal); return; }
         var tasks = writeTasks(kinds), wrote = [], bad = [], firstBad = null, kept = false;
         function taskLabel(t) { return kindLabel(t.kind) + (t.kind === "notes" ? " " + t.part + "/" + NOTES_PARTS : ""); }
-        function status() { say("Writing: " + tasks.map(function (t) { return taskLabel(t) + (wrote.indexOf(t.key) > -1 ? " ✓" : bad.indexOf(t.key) > -1 ? " ✗" : " …"); }).join(" · ") + ". This takes a few minutes."); }
+        function status() { say("Writing: " + tasks.map(function (t) { return taskLabel(t) + (wrote.indexOf(t.key) > -1 ? " ✓" : bad.indexOf(t.key) > -1 ? " ✗" : " …"); }).join(" · ") + (onRunner ? ". Your own Claude writes these one at a time, so allow up to half an hour. If you close this page, the finished parts are still kept in your library." : ". This takes a few minutes.")); }
         function run(t) {
           return makePart(id, t.kind, t.part).then(function (res) {
             if (res.ok) { wrote.push(t.key); if (res.saved === true) kept = true; } else { bad.push(t.key); firstBad = firstBad || res; }
@@ -987,7 +1016,7 @@
         // The smallest part goes first, alone: the pages are then cached on Claude's side, and the rest read them
         // from the cache instead of each counting against the account's limit.
         return run(tasks[0]).then(function (first) {
-          if (!first.ok && (FATAL_REASONS[first.reason] || first.error === "source_too_thin" || first.error === "source_expired")) {
+          if (!first.ok && (FATAL_REASONS[first.reason] || first.error === "source_too_thin" || first.error === "source_expired" || first.error === "runner_offline" || first.error === "queue_full")) {
             go.disabled = false; say("");
             showGate(first.reason ? reasonText(first.reason) : errorText(first.error, first.status || 0).text, false);
             return null;
