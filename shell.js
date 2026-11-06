@@ -152,11 +152,199 @@
     };
   }
 
+  // ---- API fallback: the parts that need no page (tested in test/api-fallback.test.js) -------------------
+  // When the API cannot be reached, a page shows the last data THIS browser fetched (marked as old, with a banner) instead
+  // of an empty error. Reads only: a write is never held back or replayed, it simply fails and the banner says changes are
+  // paused. The copy lives in this browser's localStorage, is capped, expires, and is wiped on sign-out.
+  Logic.fallback = fallbackLogic();
+  function fallbackLogic() {
+    var API = "https://api.barnyard.site";
+    var PREFIX = "bsfb1:";
+    var MAX_ENTRIES = 60, MAX_ENTRY_CHARS = 200000, MAX_TOTAL_CHARS = 2000000, MAX_AGE_MS = 14 * 86400000;
+    var DOWN_AFTER = 2, DOWN_WINDOW_MS = 60000;
+    // Only these reads are kept. Notes, chat, photos, keys, invites, share links and search never are.
+    var READ_PREFIXES = ["/ops/board", "/planner/", "/reg/", "/mon/", "/release/", "/services/", "/kitchen/", "/academy/", "/canvas/", "/calendar/", "/incidents", "/health", "/hub/", "/auth/session"];
+    var NEVER = /(^|[\/_-])(search|photo|image|export|download|invite|share|key|keys|token|secret|password|vault)([\/_.-]|$)/i;
+
+    // "/ops/board?x=1" for an address on the API, null for anything else.
+    function apiPath(url) {
+      if (typeof url !== "string") return null;
+      if (url.indexOf(API + "/") !== 0) return null;
+      return url.slice(API.length).split("#")[0];
+    }
+    function pathOnly(path) { return String(path).split("?")[0]; }
+
+    function isCacheable(method, path) {
+      if (String(method || "GET").toUpperCase() !== "GET" || typeof path !== "string") return false;
+      var p = pathOnly(path);
+      if (NEVER.test(p)) return false;
+      return READ_PREFIXES.some(function (pre) { return p === pre || p.indexOf(pre) === 0; });
+    }
+    function isLogout(path) { return pathOnly(path) === "/auth/logout"; }
+
+    // 5xx from Cloudflare saying the Worker or origin is unreachable. A plain 500 is the app's own error, not an outage.
+    function isDownStatus(status) { return status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 530); }
+
+    function parseJson(text) { try { return JSON.parse(text); } catch (e) { return undefined; } }
+    // The sign-in answer is kept only while it says signed in; a signed-out answer wipes everything.
+    function shouldStore(path, text) {
+      if (typeof text !== "string" || !text || text.length > MAX_ENTRY_CHARS) return false;
+      var c = text.charAt(0);
+      if (c !== "{" && c !== "[") return false;
+      if (pathOnly(path) === "/auth/session") { var j = parseJson(text); return !!(j && j.authenticated === true); }
+      return true;
+    }
+    function sessionEnded(path, text) {
+      if (pathOnly(path) !== "/auth/session") return false;
+      var j = parseJson(text);
+      return !!(j && j.authenticated === false);
+    }
+
+    function ageText(ms) {
+      var s = Math.max(0, Math.floor(ms / 1000));
+      if (s < 60) return "just now";
+      var m = Math.floor(s / 60); if (m < 60) return m + " min ago";
+      var h = Math.floor(m / 60); if (h < 24) return h + (h === 1 ? " hour ago" : " hours ago");
+      var d = Math.floor(h / 24); return d + (d === 1 ? " day ago" : " days ago");
+    }
+
+    // The saved reads. `storage` has the localStorage methods; any of them may throw (private window, full disk).
+    function makeStore(storage, now) {
+      var clock = now || Date.now;
+      function keys() {
+        var out = [];
+        try { for (var i = 0; i < storage.length; i++) { var k = storage.key(i); if (k && k.indexOf(PREFIX) === 0) out.push(k); } } catch (e) { /* none */ }
+        return out;
+      }
+      function drop(k) { try { storage.removeItem(k); } catch (e) { /* ignore */ } }
+      function entry(k) {
+        var raw; try { raw = storage.getItem(k); } catch (e) { return null; }
+        var j = raw ? parseJson(raw) : undefined;
+        return j && typeof j.t === "number" && typeof j.b === "string" ? { k: k, t: j.t, b: j.b, size: raw.length } : null;
+      }
+      function trim() {
+        var all = keys().map(entry).filter(Boolean).sort(function (a, b) { return a.t - b.t; });
+        var total = all.reduce(function (n, e) { return n + e.size; }, 0);
+        while (all.length && (all.length > MAX_ENTRIES || total > MAX_TOTAL_CHARS)) { var o = all.shift(); total -= o.size; drop(o.k); }
+      }
+      return {
+        put: function (path, text) {
+          if (!shouldStore(path, text)) return false;
+          var raw = JSON.stringify({ t: clock(), b: text });
+          try { storage.setItem(PREFIX + path, raw); } catch (e) {
+            trim(); keys().slice(0, 5).forEach(drop);
+            try { storage.setItem(PREFIX + path, raw); } catch (e2) { return false; }
+          }
+          trim();
+          return true;
+        },
+        get: function (path) {
+          var e = entry(PREFIX + path);
+          if (!e) return null;
+          if (clock() - e.t > MAX_AGE_MS) { drop(e.k); return null; }
+          return { t: e.t, body: e.b };
+        },
+        clear: function () { keys().forEach(drop); },
+        count: function () { return keys().length; }
+      };
+    }
+
+    // Decides when the API counts as down: two failures within a minute. Any good answer clears it.
+    function makeMonitor(now) {
+      var clock = now || Date.now, stamps = [], down = false;
+      return {
+        fail: function () {
+          var t = clock(); stamps = stamps.filter(function (s) { return t - s < DOWN_WINDOW_MS; }); stamps.push(t);
+          var changed = false;
+          if (!down && stamps.length >= DOWN_AFTER) { down = true; changed = true; }
+          return { down: down, changed: changed };
+        },
+        ok: function () { stamps = []; var changed = down; down = false; return { down: false, changed: changed }; },
+        isDown: function () { return down; }
+      };
+    }
+
+    // What the banner says. `oldest` is when the oldest saved answer shown on this page was fetched, or 0 when none was.
+    function bannerText(state, oldest, now) {
+      if (state === "down") {
+        return "Can't reach the Barnyard API right now. " + (oldest ? "Showing the last data this browser saw (" + ageText((now || Date.now()) - oldest) + "). " : "") + "Changes are paused until it is back.";
+      }
+      if (state === "back") return "The API is back. Reload to see the current data.";
+      return "";
+    }
+
+    // fetch with the fallback around it. `hooks` say what the page should do: onDown(r), onUp(r) (r is the monitor's answer)
+    // and onStale(fetchedAt). A call to anything but the API goes straight through untouched.
+    function wrapFetch(realFetch, store, monitor, hooks) {
+      var h = hooks || {};
+      function failed(path, cacheable) {
+        var r = monitor.fail();
+        if (h.onDown) h.onDown(r);
+        if (!r.down || !cacheable) return null;
+        var hit = store.get(path);
+        if (!hit) return null;
+        if (h.onStale) h.onStale(hit.t);
+        return new Response(hit.body, { status: 200, headers: { "Content-Type": "application/json", "X-Barnyard-Stale": String(hit.t) } });
+      }
+      return function (input, init) {
+        var url = typeof input === "string" ? input : (input && input.url) || "";
+        var path = apiPath(url);
+        if (path === null) return realFetch(input, init);
+        var method = String((init && init.method) || (input && typeof input === "object" && input.method) || "GET").toUpperCase();
+        var cacheable = isCacheable(method, path);
+        if (isLogout(path)) store.clear();
+        // One try: { res } for an answer (an outage 5xx included, marked bad), { err } for a network failure. A call the page
+        // cancelled rejects straight through.
+        function attempt() {
+          return realFetch(input, init).then(function (res) { return { res: res, bad: isDownStatus(res.status) }; }, function (err) {
+            if (err && err.name === "AbortError") throw err;
+            return { err: err, bad: true };
+          });
+        }
+        function finish(o) {
+          if (o.bad) {
+            var old = failed(path, cacheable);
+            if (old) return old;
+            if (o.err) throw o.err;
+            return o.res;
+          }
+          var res = o.res, r = monitor.ok();
+          if (h.onUp) h.onUp(r);
+          if (res.status === 401) store.clear();
+          var type = (res.headers && res.headers.get && res.headers.get("content-type")) || "";
+          if (cacheable && res.ok && res.status !== 204 && type.indexOf("application/json") !== -1) {
+            res.clone().text().then(function (t) {
+              if (sessionEnded(path, t)) store.clear(); else store.put(path, t);
+            }).catch(function () { /* keep the page working */ });
+          }
+          return res;
+        }
+        return attempt().then(function (o) {
+          if (!o.bad || !cacheable || monitor.isDown()) return finish(o);
+          // A read that failed is tried once more at once (reads are safe to repeat): a blip is absorbed, and a real
+          // outage is recognised on the page's first request, so the sign-in check does not flash "Log in".
+          var r = monitor.fail();
+          if (h.onDown) h.onDown(r);
+          return new Promise(function (go) { setTimeout(go, h.retryMs == null ? 600 : h.retryMs); }).then(attempt).then(finish);
+        });
+      };
+    }
+
+    return {
+      API: API, PREFIX: PREFIX, MAX_ENTRIES: MAX_ENTRIES, MAX_ENTRY_CHARS: MAX_ENTRY_CHARS, MAX_TOTAL_CHARS: MAX_TOTAL_CHARS, MAX_AGE_MS: MAX_AGE_MS,
+      DOWN_AFTER: DOWN_AFTER, DOWN_WINDOW_MS: DOWN_WINDOW_MS, READ_PREFIXES: READ_PREFIXES,
+      apiPath: apiPath, isCacheable: isCacheable, isLogout: isLogout, isDownStatus: isDownStatus, shouldStore: shouldStore, sessionEnded: sessionEnded,
+      ageText: ageText, makeStore: makeStore, makeMonitor: makeMonitor, bannerText: bannerText, wrapFetch: wrapFetch
+    };
+  }
+
   if (typeof document === "undefined" || !window.BarnyardTheme) {
     if (typeof module !== "undefined" && module.exports) module.exports = Logic;
     return;
   }
   var Theme = window.BarnyardTheme;
+  var apiState = { down: false, staleOldest: 0, banner: null, text: null, button: null, timer: 0 };
+  installApiFallback();
 
   var HUB = "https://dashboard.barnyard.site/";
   var PAGES = [
@@ -1040,6 +1228,69 @@
     body.appendChild(radios("sidebar", "Sidebar", "Icons only gives the page more room.", [{ value: "full", title: "Full" }, { value: "icons", title: "Icons only" }], s.sidebar, function (v) { Theme.set({ sidebar: v }); }));
   }
 
+  // ---- API fallback: the browser half --------------------------------------
+  // Wraps window.fetch for calls to the API. Runs before the page's own scripts (shell.js is loaded ahead of them).
+  function installApiFallback() {
+    var FB = Logic.fallback;
+    if (typeof window.fetch !== "function" || window.__barnyardFallback) return;
+    window.__barnyardFallback = true;
+    var realFetch = window.fetch.bind(window);
+    var store;
+    try { store = FB.makeStore(window.localStorage); } catch (e) { store = FB.makeStore({ length: 0, key: function () { return null; }, getItem: function () { return null; }, setItem: function () { throw new Error("none"); }, removeItem: function () {} }); }
+    var monitor = FB.makeMonitor();
+
+    function showBanner(state) {
+      if (!apiState.banner) {
+        var bar = document.createElement("div");
+        bar.className = "api-banner";
+        bar.setAttribute("role", "status");
+        bar.setAttribute("aria-live", "polite");
+        var text = document.createElement("span");
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "Reload";
+        btn.addEventListener("click", function () { location.reload(); });
+        bar.appendChild(text); bar.appendChild(btn);
+        document.body.appendChild(bar);
+        apiState.banner = bar; apiState.text = text; apiState.button = btn;
+      }
+      apiState.text.textContent = FB.bannerText(state, apiState.staleOldest);
+      apiState.button.hidden = state !== "back";
+      apiState.banner.className = "api-banner is-" + state;
+      apiState.banner.hidden = false;
+    }
+    function hideBanner() { if (apiState.banner) apiState.banner.hidden = true; }
+
+    function noteUp(r) {
+      apiState.down = false;
+      if (r.changed) {
+        if (apiState.timer) { clearInterval(apiState.timer); apiState.timer = 0; }
+        if (apiState.staleOldest) showBanner("back"); else hideBanner();
+      }
+    }
+    function probe() {
+      if (typeof document !== "undefined" && document.hidden) return;
+      var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+      var to = ctrl ? setTimeout(function () { ctrl.abort(); }, 8000) : 0;
+      realFetch(FB.API + "/auth/session", { credentials: "include", cache: "no-store", referrerPolicy: "no-referrer", signal: ctrl ? ctrl.signal : undefined })
+        .then(function (res) { if (!FB.isDownStatus(res.status)) noteUp(monitor.ok()); })
+        .catch(function () { /* still down */ })
+        .then(function () { if (to) clearTimeout(to); });
+    }
+
+    window.fetch = FB.wrapFetch(realFetch, store, monitor, {
+      onDown: function (r) {
+        apiState.down = r.down;
+        if (r.changed) { showBanner("down"); apiState.timer = setInterval(probe, 20000); }
+      },
+      onUp: noteUp,
+      onStale: function (t) {
+        if (!apiState.staleOldest || t < apiState.staleOldest) apiState.staleOldest = t;
+        showBanner("down");
+      }
+    });
+  }
+
   // ---- public API ----------------------------------------------------------
 
   window.BarnyardShell = {
@@ -1068,6 +1319,8 @@
       close: function () { paletteClose(true); },
       registerCommands: function (fn) { if (typeof fn === "function" && palette.extra.indexOf(fn) === -1) palette.extra.push(fn); }
     },
+    // { down, since } -- whether the API is unreachable now, and when the oldest saved answer this page is showing was fetched (0 if none).
+    apiStatus: function () { return { down: apiState.down, since: apiState.staleOldest }; },
     openSettings: openSettings,
     closeSettings: closeSettings,
     controls: { radios: radios, toggle: toggle, svg: svg },

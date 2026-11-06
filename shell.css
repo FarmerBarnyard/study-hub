@@ -195,6 +195,14 @@ a.sub { text-decoration: none; } a.sub:hover { color: var(--fg-strong); text-dec
 @keyframes pulse { 50% { opacity: .3; } }
 .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); padding: 10px 16px; border-radius: 10px; background: var(--fg-strong); color: var(--bg); font-weight: 500; z-index: 60; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100vw - 32px); }
 .toast.show { opacity: 1; }
+/* The API cannot be reached (shell.js, "API fallback"): old data is on screen and changes are paused. */
+.api-banner { position: fixed; inset-inline: 16px; bottom: 72px; margin-inline: auto; width: max-content; max-width: min(720px, calc(100vw - 32px)); display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 10px; background: var(--panel); color: var(--fg-strong); border: 1px solid var(--alert); box-shadow: 0 6px 24px rgba(0, 0, 0, .18); font-weight: 500; z-index: 59; }
+@media (max-width: 860px) { .api-banner { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); } }
+.api-banner[hidden] { display: none; }
+.api-banner.is-back { border-color: var(--ok); }
+.api-banner button { flex: none; border: 1px solid var(--line); background: var(--panel-2); color: var(--fg-strong); border-radius: 8px; padding: 6px 12px; font: inherit; font-weight: 600; cursor: pointer; min-height: 32px; }
+.api-banner button:hover { border-color: var(--accent); }
+.api-banner button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .empty { padding: 32px 18px; text-align: center; color: var(--fg-dim); }
 .empty b { display: block; color: var(--fg-strong); margin-bottom: 4px; }
 
