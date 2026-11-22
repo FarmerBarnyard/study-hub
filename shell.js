@@ -2,7 +2,7 @@
 // light/dark switch, Settings), page-background layer and the Settings panel.
 //
 // A page supplies only its own content, inside <main id="page" class="content">,
-// and says which page it is with <body data-shell="overview|ops|vuln|calendar|monitor|chat|study|kb|campaign|stocks">.
+// and says which page it is with <body data-shell="overview|ops|projects|vuln|calendar|monitor|chat|study|kb|campaign|stocks">.
 // This script wraps that content in the shell.
 //
 // A generated page whose body this repo does not author (the Stocks dashboard,
@@ -352,6 +352,9 @@
     // permissions list exists and lacks it (presentation only: the Worker refuses the request).
     { id: "overview", title: "Overview", group: "", icon: "home", path: "", local: "./", perm: "overview.view" },
     { id: "ops", title: "Ops board", group: "Work", icon: "board", path: "ops.html", local: "ops.html", perm: "ops.view" },
+    // Projects (projects.html): the owner's project management and timeline review. Its live part is the owner's Ops board (items titled
+    // "RL ..."), so it takes the board's permission (ops.view): taking the board away from someone takes this page too.
+    { id: "projects", title: "Projects", group: "Work", icon: "timeline", path: "projects.html", local: "projects.html", ownerOnly: true, perm: "ops.view", keywords: "project management timeline roadmap gantt milestones phases sittings costs remote layout rl" },
     { id: "vuln", title: "Vulnerabilities", group: "Work", icon: "shield", path: "vulnerabilities.html", local: "vulnerabilities.html", perm: "vuln.view" },
     // ownerOnly: shown only to the hub owner (Theme.who says owner === true), and hidden until that is known.
     { id: "calendar", title: "Calendar", group: "Work", icon: "calendar", path: "calendar.html", local: "calendar.html", ownerOnly: true, perm: "calendar.view" },
@@ -391,6 +394,7 @@
 
   var ICONS = {
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
+    timeline: '<path d="M3 4v16h18"/><rect x="6" y="6" width="7" height="3" rx="1"/><rect x="9" y="11" width="9" height="3" rx="1"/><rect x="7" y="16" width="6" height="2.5" rx="1"/>',
     board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
     chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-7l-5 4v-4H6a2 2 0 01-2-2z"/><path d="M8 9h8M8 12h5"/>',
     people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17.5 14.2c2.3.2 3.9 1.7 4.3 4.3"/>',
