@@ -1,0 +1,135 @@
+/* Look E "Poster": the page leads with one big sentence, set large; everything under it is a plain ruled list.
+   Heavy rules, big Bricolage Grotesque type, no cards, no icons in the menu. A pure CSS layer on the page's own markup.
+   The menu becomes a row of words along the top (the mock-up has no sidebar): the Sidebar setting is retired for this look
+   (the control stays and is harmless: "icons only" still shows words). On a narrow window the shell's own bottom bar is restored.
+   Not in this layer: the long-form prose columns of the mock-up (they need new markup).
+   Every rule is scoped to html[data-look="poster"]; every colour is a theme variable. */
+
+/* contrast: --fg on --bg; --fg-strong on --bg; --fg-dim on --bg; --fg-strong on --panel; --fg on --panel; --fg-dim on --panel */
+
+html[data-look="poster"] {
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --lift: none;
+  --base: 16px;
+}
+html[data-look="poster"][data-density="compact"] { --base: 14.5px; }
+
+/* The menu: a row of words along the top, a heavy rule under it */
+html[data-look="poster"] .app { display: block; }
+html[data-look="poster"] .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 28px; padding: 20px clamp(16px, 4vw, 44px) 10px; margin: 0; border-right: 0; border-bottom: 3px solid var(--fg-strong); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="poster"] .brand { padding: 0; gap: 0; }
+html[data-look="poster"] .brand-mark { display: none; }
+html[data-look="poster"] .brand-name { font: 800 26px/1 var(--font-display); letter-spacing: -.02em; color: var(--fg-strong); }
+html[data-look="poster"] .nav { flex: 1 1 auto; flex-direction: row; flex-wrap: wrap; gap: 4px 20px; align-items: baseline; }
+html[data-look="poster"] .nav-group { display: none; }
+html[data-look="poster"] .nav a { gap: 0; padding: 2px 0; border-radius: 0; font-size: 15px; font-weight: 400; background: transparent; box-shadow: none; }
+html[data-look="poster"] .nav a > svg { display: none; }
+html[data-look="poster"] .nav a:hover { background: transparent; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 5px; }
+html[data-look="poster"] .nav a[aria-current="page"] { background: transparent; color: var(--fg-strong); box-shadow: none; font-weight: 600; text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 6px; text-decoration-color: var(--accent); }
+html[data-look="poster"] .nav .badge { margin-left: 6px; position: static; border-radius: 0; }
+html[data-look="poster"] .side-foot { margin-top: 0; flex-direction: row; align-items: baseline; gap: 14px; }
+html[data-look="poster"] .auth-status { padding: 0; }
+/* the Sidebar "icons only" setting is retired here: the words stay */
+html[data-look="poster"][data-sidebar="icons"] .lbl { display: inline; }
+html[data-look="poster"][data-sidebar="icons"] .brand-name,
+html[data-look="poster"][data-sidebar="icons"] .auth-status { display: inline; }
+html[data-look="poster"][data-sidebar="icons"] .side { padding-inline: clamp(16px, 4vw, 44px); align-items: baseline; }
+html[data-look="poster"][data-sidebar="icons"] .nav a { justify-content: flex-start; }
+
+/* Top bar, buttons, inputs: square and plain */
+html[data-look="poster"] .top { padding: 10px clamp(16px, 4vw, 44px); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="poster"] .icon-btn { border-radius: 0; background: transparent; }
+html[data-look="poster"] .search input { border-radius: 0; }
+html[data-look="poster"] .btn,
+html[data-look="poster"] .ops-btn { border-radius: 0; font-weight: 500; }
+html[data-look="poster"] input,
+html[data-look="poster"] select,
+html[data-look="poster"] textarea { border-radius: 0; }
+
+/* The sentence and the ruled list */
+html[data-look="poster"] .content { padding: 8px clamp(16px, 4vw, 44px) 64px; max-width: 1180px; }
+html[data-look="poster"] .page-head { margin: 14px 0 22px; padding-bottom: 10px; border-bottom: 3px solid var(--fg-strong); }
+html[data-look="poster"] .page-head h1 { font: 800 clamp(30px, 5vw, 52px)/1.04 var(--font-display); letter-spacing: -.025em; }
+html[data-look="poster"] .hero { margin: 18px 0 var(--hero-gap); max-width: none; }
+html[data-look="poster"] .hero h1 { font: 800 clamp(34px, 6vw, 64px)/1.02 var(--font-display); letter-spacing: -.025em; max-width: 20ch; }
+html[data-look="poster"] .hero p { margin-top: 14px; font-size: 16px; }
+html[data-look="poster"] .widgets { display: block; }
+html[data-look="poster"] .w { margin: 0 0 var(--row-gap); }
+html[data-look="poster"] .w:not(.lift) { border-top: 1px solid var(--fg-dim); padding-top: 14px; }
+html[data-look="poster"] .lift { background: transparent; border: 0; border-top: 3px solid var(--fg-strong); border-radius: 0; box-shadow: none; }
+html[data-look="poster"] .need { padding: 0; }
+html[data-look="poster"] .need li { padding: var(--need-pad) 0; border-top: 1px solid var(--fg-dim); }
+html[data-look="poster"] .need li:first-child { border-top: 0; }
+html[data-look="poster"] .need b { font: 650 clamp(19px, 2.6vw, 26px)/1.2 var(--font-display); letter-spacing: -.01em; text-decoration: underline; text-decoration-color: var(--attn); text-decoration-thickness: 3px; text-underline-offset: 5px; }
+html[data-look="poster"] .need p { font-size: 14px; }
+html[data-look="poster"] .need-head { padding: 14px 0 6px; }
+html[data-look="poster"] .need-head h2,
+html[data-look="poster"] .sec-head h2,
+html[data-look="poster"] .st-head h2 { font: 700 20px/1.2 var(--font-display); letter-spacing: -.01em; }
+html[data-look="poster"] .spine { padding-left: 0; }
+html[data-look="poster"] .spine::before { display: none; }
+html[data-look="poster"] .spine li { padding: 8px 0; border-top: 1px solid var(--fg-dim); }
+html[data-look="poster"] .spine li::before { display: none; }
+
+/* Other blocks: ruled, square, no shadow */
+html[data-look="poster"] .box,
+html[data-look="poster"] .ops-tile,
+html[data-look="poster"] .ops-list,
+html[data-look="poster"] .ops-panel,
+html[data-look="poster"] .ops-gate,
+html[data-look="poster"] .ops-onboard,
+html[data-look="poster"] .ops-setup,
+html[data-look="poster"] .ops-needs,
+html[data-look="poster"] .ops-pc-card,
+html[data-look="poster"] .ops-pc-file,
+html[data-look="poster"] .ops-code,
+html[data-look="poster"] .ops-run-box,
+html[data-look="poster"] .ops-conn,
+html[data-look="poster"] .ops-notice,
+html[data-look="poster"] .ops-banner,
+html[data-look="poster"] .ops-reveal,
+html[data-look="poster"] .ops-toast,
+html[data-look="poster"] .tl-stat,
+html[data-look="poster"] .tl-approval,
+html[data-look="poster"] .tk-rows,
+html[data-look="poster"] .tk-totals,
+html[data-look="poster"] .tk-msg,
+html[data-look="poster"] .tk-accept { border-radius: 0; box-shadow: none; }
+html[data-look="poster"] .ops-tabs,
+html[data-look="poster"] .ops-tab,
+html[data-look="poster"] .ops-filter,
+html[data-look="poster"] .ops-fold,
+html[data-look="poster"] .ops-step::before,
+html[data-look="poster"] .tl-bar { border-radius: 0; }
+html[data-look="poster"] .ops-tab[aria-selected="true"],
+html[data-look="poster"] .ops-tab[aria-pressed="true"] { box-shadow: none; border-bottom: 3px solid var(--fg-strong); }
+
+/* State: a word and a shape, never colour alone */
+html[data-look="poster"] .chip,
+html[data-look="poster"] .ops-chip,
+html[data-look="poster"] .tl-pill { border-radius: 0; background: transparent; border-color: currentColor; font-weight: 500; }
+html[data-look="poster"] .chip.ok::before { content: "\25A0"; }
+html[data-look="poster"] .chip.attn::before { content: "\25C6"; }
+html[data-look="poster"] .chip.alert::before { content: "\25B2"; }
+html[data-look="poster"] .chip.info::before { content: "\25CF"; }
+html[data-look="poster"] .st i,
+html[data-look="poster"] .live::before,
+html[data-look="poster"] .live-dot { border-radius: 0; }
+
+/* Narrow windows: back to the shell's bottom bar */
+@media (max-width: 860px) {
+  html[data-look="poster"] .app { display: grid; }
+  html[data-look="poster"] .side { position: fixed; inset: auto 0 0 0; z-index: 20; flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; gap: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); border-bottom: 0; border-top: 1px solid var(--line); background: var(--bg); }
+  html[data-look="poster"] .nav { flex-wrap: nowrap; gap: 0; width: 100%; justify-content: space-around; }
+  html[data-look="poster"] .nav a,
+  html[data-look="poster"][data-sidebar="icons"] .nav a { flex-direction: column; justify-content: center; gap: 2px; padding: 6px 8px; min-width: 56px; font-size: 11px; font-weight: 400; }
+  html[data-look="poster"] .nav a > svg { display: inline-block; }
+  html[data-look="poster"] .nav a[aria-current="page"] { text-decoration: none; font-weight: 600; }
+  html[data-look="poster"] .top,
+  html[data-look="poster"] .content { padding-inline: 16px; }
+  html[data-look="poster"] .content { padding-bottom: 96px; }
+}
+
+/* Keyboard focus */
+html[data-look="poster"] :focus-visible { outline: 3px solid var(--fg-strong); outline-offset: 2px; }

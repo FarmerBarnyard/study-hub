@@ -1,0 +1,127 @@
+/* Look P "Raw": deliberately plain, brutalist-web. A document, not an app: browser-default serif at the default size, real underlined links,
+   bordered tables, thick ink rules, no radius, no shadow, no motion, no icons in the menu. The menu is one line of words separated by bars.
+   The page content sits on one solid sheet; the chosen background shows only on the desk around it. A pure CSS layer (see docs/looks.md).
+   Not in this layer: the mock-up's one-line count in place of the headline, its table-mode rendering of card grids, and its text replacing the
+   top-bar icon buttons (they need markup or copy changes), so the top-bar buttons keep their icons.
+   Every rule is scoped to html[data-look="raw"]; every colour is a theme variable. */
+
+/* contrast: --fg-strong on --panel-2; --fg on --panel-2; --fg-strong on --panel; --fg on --panel */
+
+html[data-look="raw"] {
+  --font-display: "Times New Roman", Times, serif;
+  --font-body: "Times New Roman", Times, serif;
+  --font-mono: "Courier New", Courier, monospace;
+  --lift: none;
+  --base: 16px;
+}
+html[data-look="raw"][data-density="compact"] { --base: 15px; }
+html[data-look="raw"] *,
+html[data-look="raw"] *::before,
+html[data-look="raw"] *::after { transition: none !important; animation: none !important; border-radius: 0 !important; box-shadow: none !important; }
+
+/* Menu: one line of words along the top, separated by bars (wide windows). Narrow windows keep the shell's own bottom bar. */
+@media (min-width: 861px) {
+  html[data-look="raw"] .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  html[data-look="raw"] .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; padding: 10px 24px; background: var(--panel); backdrop-filter: none; -webkit-backdrop-filter: none; border-right: 0; border-bottom: 3px solid var(--fg-strong); }
+  html[data-look="raw"] .brand { padding: 0; gap: 6px; }
+  html[data-look="raw"] .brand-mark { display: none; }
+  html[data-look="raw"] .brand-name { font: 700 18px/1.2 var(--font-display); letter-spacing: 0; color: var(--fg-strong); }
+  html[data-look="raw"] .nav { flex-direction: row; flex-wrap: wrap; gap: 2px 0; }
+  html[data-look="raw"] .nav-group { display: none; }
+  html[data-look="raw"] .nav a { gap: 4px; padding: 0 9px; background: transparent; box-shadow: none; font-weight: 400; font-size: 16px; color: var(--fg-strong); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+  html[data-look="raw"] .nav a + a { border-left: 1px solid var(--fg-strong); }
+  html[data-look="raw"] .nav a > svg:first-child { display: none; }
+  html[data-look="raw"][data-sidebar="icons"] .nav a > svg:first-child { display: inline-block; }
+  html[data-look="raw"] .nav a:hover { background: var(--panel-2); }
+  html[data-look="raw"] .nav a[aria-current="page"] { background: transparent; font-weight: 700; text-decoration: none; }
+  html[data-look="raw"] .nav a[aria-current="page"]::before { content: "["; font-family: var(--font-mono); }
+  html[data-look="raw"] .nav a[aria-current="page"]::after { content: "]"; font-family: var(--font-mono); }
+  html[data-look="raw"] .side-foot { margin-top: 0; margin-left: auto; flex-direction: row; align-items: baseline; gap: 12px; }
+}
+html[data-look="raw"] .nav .badge { background: transparent; color: var(--fg-strong); font-family: var(--font-mono); }
+
+/* The sheet */
+html[data-look="raw"] .content { max-width: 62rem; margin: 16px 0 40px 24px; padding: 8px 28px 40px; background: var(--panel); outline: 3px solid var(--fg-strong); }
+html[data-look="raw"] .page-head { margin: 8px 0 14px; }
+html[data-look="raw"] .page-head h1,
+html[data-look="raw"] .hero h1 { font: 700 2em/1.2 var(--font-display); letter-spacing: 0; color: var(--fg-strong); }
+html[data-look="raw"] .page-head p,
+html[data-look="raw"] .hero p { margin-top: 4px; font-size: 1em; }
+html[data-look="raw"] .hero { margin: 8px 0 var(--hero-gap); max-width: none; }
+html[data-look="raw"] .need-head h2,
+html[data-look="raw"] .st-head h2,
+html[data-look="raw"] .sec-head h2,
+html[data-look="raw"] .w h2 { font: 700 1.35em/1.25 var(--font-display); letter-spacing: 0; text-transform: none; color: var(--fg-strong); }
+
+/* Sections: a 4px rule above each, no cards */
+html[data-look="raw"] .lift,
+html[data-look="raw"] .box,
+html[data-look="raw"] .ops-tile,
+html[data-look="raw"] .ops-list,
+html[data-look="raw"] .ops-panel,
+html[data-look="raw"] .ops-gate,
+html[data-look="raw"] .ops-onboard,
+html[data-look="raw"] .ops-setup,
+html[data-look="raw"] .ops-needs,
+html[data-look="raw"] .ops-pc-card,
+html[data-look="raw"] .ops-pc-file,
+html[data-look="raw"] .ops-code,
+html[data-look="raw"] .ops-run-box,
+html[data-look="raw"] .ops-conn,
+html[data-look="raw"] .ops-notice,
+html[data-look="raw"] .ops-banner,
+html[data-look="raw"] .ops-reveal,
+html[data-look="raw"] .tl-stat,
+html[data-look="raw"] .tl-approval,
+html[data-look="raw"] .tk-rows,
+html[data-look="raw"] .tk-totals,
+html[data-look="raw"] .tk-msg,
+html[data-look="raw"] .tk-accept { background: transparent; border: 0; border-top: 4px solid var(--fg-strong); padding-top: 8px; }
+html[data-look="raw"] .w:not(.lift) { border-top: 4px solid var(--fg-strong); padding-top: 8px; }
+html[data-look="raw"] .need { padding: 0; }
+html[data-look="raw"] .need li { padding: 6px 0; border-top: 1px solid var(--fg-strong); }
+html[data-look="raw"] .need li:first-child { border-top: 0; }
+html[data-look="raw"] .ops-toast { border: 2px solid var(--fg-strong); background: var(--panel); }
+
+/* Tables: a 2px outer border, 1px grid, header row on the second surface */
+html[data-look="raw"] table { border-collapse: collapse; border: 2px solid var(--fg-strong); }
+html[data-look="raw"] th,
+html[data-look="raw"] td { border: 1px solid var(--fg-dim); padding: 4px 8px; text-align: left; font-variant-numeric: tabular-nums; }
+html[data-look="raw"] th { background: var(--panel-2); color: var(--fg-strong); font-weight: 700; }
+
+/* Links, buttons, inputs: the browser's own idea, in the theme's colours */
+html[data-look="raw"] .content a { color: var(--fg-strong); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+html[data-look="raw"] .btn,
+html[data-look="raw"] .ops-btn,
+html[data-look="raw"] .icon-btn { background: var(--panel-2); color: var(--fg-strong); border: 2px solid var(--fg-strong); font-weight: 400; }
+html[data-look="raw"] .btn-sm { padding: 0 8px; }
+html[data-look="raw"] input,
+html[data-look="raw"] select,
+html[data-look="raw"] textarea { background: var(--panel); color: var(--fg-strong); border: 2px solid var(--fg-strong); }
+html[data-look="raw"] .tl-bar { border: 1px solid var(--fg-strong); }
+
+/* State: a word and a bracketed symbol, never colour alone */
+html[data-look="raw"] .chip,
+html[data-look="raw"] .ops-chip,
+html[data-look="raw"] .tl-pill { background: transparent; border-color: transparent; padding: 0; font-weight: 400; color: var(--fg-strong); }
+html[data-look="raw"] .chip::before,
+html[data-look="raw"] .ops-chip::before { width: auto; height: auto; background: transparent; margin-right: 4px; font-family: var(--font-mono); font-size: 14px; }
+html[data-look="raw"] .chip.ok::before { content: "[+]"; }
+html[data-look="raw"] .chip.attn::before { content: "[!]"; }
+html[data-look="raw"] .chip.alert::before { content: "[x]"; }
+html[data-look="raw"] .chip.info::before,
+html[data-look="raw"] .chip.accent::before { content: "[i]"; }
+html[data-look="raw"] .st i,
+html[data-look="raw"] .live::before,
+html[data-look="raw"] .live-dot { display: none; }
+
+/* Narrow windows: the sheet fills the screen; the shell's bottom bar keeps its icon-over-label items */
+@media (max-width: 860px) {
+  html[data-look="raw"] .side { padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); gap: 0; border-right: 0; border-top: 3px solid var(--fg-strong); }
+  html[data-look="raw"] .nav a { gap: 2px; padding: 6px 8px; }
+  html[data-look="raw"] .nav a > svg:first-child { display: inline-block; }
+  html[data-look="raw"] .content { margin: 0 0 96px; padding: 8px 14px 24px; outline: 0; }
+}
+
+/* Keyboard focus */
+html[data-look="raw"] :focus-visible { outline: 3px solid var(--fg-strong); outline-offset: 2px; }
