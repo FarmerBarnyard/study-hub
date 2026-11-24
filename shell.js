@@ -706,7 +706,8 @@
       got.forEach(function (c) { if (c && c.title && typeof c.run === "function") list.push({ group: "Actions", title: String(c.title), hint: c.hint ? String(c.hint) : "", keywords: c.keywords ? String(c.keywords) : "", run: c.run }); });
     });
     if (typed) {   // eighteen themes would crowd the empty list, so they appear once the person types
-      Theme.THEMES.forEach(function (t) { list.push({ group: "Themes", title: "Theme: " + t.name, hint: "Appearance", keywords: "colour color look", run: function () { Theme.set({ theme: t.id }); toast("Theme: " + t.name); } }); });
+      Theme.THEMES.forEach(function (t) { list.push({ group: "Themes", title: "Theme: " + t.name, hint: "Appearance", keywords: "colour color", run: function () { Theme.set({ theme: t.id }); toast("Theme: " + t.name); } }); });
+Theme.LOOKS.forEach(function (l) { if (l.installed) list.push({ group: "Looks", title: "Look: " + l.name, hint: "Appearance", keywords: "layout structure style design look", run: function () { var before = Theme.findLook(Theme.get().look); Theme.set({ look: l.id }); toast("Look: " + l.name); if (l.renderer || (before && before.renderer)) window.setTimeout(function () { window.location.reload(); }, 600); } }); });
     }
     return list;
   }
@@ -1151,8 +1152,65 @@
     return wrap;
   }
 
-  function themeTiles(s) {
-    var dark = Theme.isDark(s);
+  // The looks: how the pages are laid out and worded. Installed looks can be chosen; looks that are drawn but not built yet
+  // are shown (disabled) so the whole set can be seen. The preview of each is drawn from its registry sketch, in the theme's
+  // own colours, with no image files (CSSOM only, like the theme swatches).
+  var LOOK_GALLERY_URL = "https://dashboard.barnyard.site/looks/";
+  function lookSketch(entry) {
+    var box = h("div", "look-thumb");
+    Theme.parseSketch(entry.sketch).forEach(function (r) {
+      var i = h("i");
+      i.style.setProperty("left", r.x + "%"); i.style.setProperty("top", r.y + "%");
+      i.style.setProperty("width", Math.min(r.w, 100 - r.x) + "%"); i.style.setProperty("height", Math.min(r.h, 100 - r.y) + "%");
+      i.style.setProperty("background", "var(" + r.colour + ")");
+      box.appendChild(i);
+    });
+    return box;
+  }
+  function lookTiles(s) {
+    var fs = h("fieldset");
+    fs.appendChild(h("legend", null, "Look"));
+    fs.appendChild(h("p", "hint", "How the pages are laid out and worded: structure, type and wording. Your theme, background, density and sidebar still apply on top of every look. Looks marked as designed are drawn but not built yet."));
+    Theme.lookSections().forEach(function (section) {
+      fs.appendChild(h("p", "tile-group", section.title));
+      var grid = h("div", "tiles tiles-looks");
+      section.looks.forEach(function (l) {
+        var label = h("label", "tile" + (l.installed ? "" : " tile-off")), input = h("input");
+        input.type = "radio";
+        input.name = "look";
+        input.value = l.id;
+        input.setAttribute("aria-label", l.name + (l.installed ? "" : " (designed, not built yet)"));
+        input.checked = l.installed && s.look === l.id;
+        input.disabled = !l.installed;
+        input.addEventListener("change", function () {
+          var before = Theme.findLook(Theme.get().look);
+          Theme.set({ look: l.id });
+          toast("Look: " + l.name);
+          // A look that draws its own markup for some pages needs the page drawn again.
+          if (l.renderer || (before && before.renderer)) window.setTimeout(function () { window.location.reload(); }, 600);
+        });
+        var card = h("div", "tile-card"), name = h("span", "tile-name");
+        name.appendChild(document.createTextNode(l.name));
+        name.appendChild(svg("check"));
+        card.appendChild(lookSketch(l));
+        card.appendChild(name);
+        card.appendChild(h("span", "tile-note", l.blurb));
+        label.appendChild(input); label.appendChild(card);
+        grid.appendChild(label);
+      });
+      fs.appendChild(grid);
+    });
+    var link = h("a", "tile-link", "See every look in the gallery");
+    link.href = LOOK_GALLERY_URL;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    var p = h("p", "hint");
+    p.appendChild(link);
+    fs.appendChild(p);
+    return fs;
+  }
+
+  function themeTiles(s) {    var dark = Theme.isDark(s);
     var fs = h("fieldset");
     fs.appendChild(h("legend", null, "Theme"));
     fs.appendChild(h("p", "hint", "Eighteen colour themes. Each has a light and a dark version, so Mode above still applies."));
@@ -1226,6 +1284,7 @@
   function appearanceTab(body) {
     var s = Theme.get();
     body.appendChild(radios("mode", "Mode", "Follow your device, or pick one.", [{ value: "light", title: "Light" }, { value: "dark", title: "Dark" }, { value: "system", title: "Match device" }], s.mode, function (v) { Theme.set({ mode: v }); }));
+    body.appendChild(lookTiles(s));
     body.appendChild(themeTiles(s));
     body.appendChild(backgroundTiles(s));
     body.appendChild(radios("density", "Density", "Compact tightens spacing so more fits on screen.", [{ value: "comfortable", title: "Comfortable" }, { value: "compact", title: "Compact" }], s.density, function (v) { Theme.set({ density: v }); }));
