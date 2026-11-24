@@ -1,0 +1,204 @@
+/* Look K "Lines": every group of work is a line on a transit map; its stops are stations; state is drawn on the station.
+   No cards, no icons, no shadows. One typeface (the site's IBM Plex Sans); clock times in IBM Plex Mono. Station shapes: filled dot =
+   running or soaking, ring with a centre = needs you, half filled = in progress, cross in a ring = down, diamond = degraded,
+   dashed ring = overdue, plain ring on a dashed run = planned. Every state is also in words (on the label, in the status board, in the key).
+   Line letters sit in a bullet so lines differ without colour. The line colours are the theme's own (accent, attn, strong text, dim text).
+   The Overview is drawn by look-layers/lines.js (opening sentence, status board, map, key, three plain lists) while
+   html[data-look-drawn="overview"] is set; every other page keeps its own markup, restyled here (flat, square, one typeface, a one-line
+   menu along the top). The Sidebar setting is retired for this look.
+   Not in this layer: the vertical station lists on the other pages, a branch for work that splits off, and a connector drawn between
+   interchange stops (an interchange is a ringed stop that says which line it is also on).
+   Every rule is scoped to html[data-look="lines"]; every colour is a theme variable. */
+
+/* contrast: --fg on --bg; --fg-strong on --bg; --fg-dim on --bg; --fg on --panel; --fg-strong on --panel; --fg-dim on --panel */
+
+html[data-look="lines"] {
+  --font-display: var(--font-body);
+  --lift: none;
+  --base: 14px;
+  --ln-open: clamp(18px, 3vw, 22px);
+  --ln-pad: 7px;
+  --ln-stroke: 6px;
+  --ln-time: 5.75rem;
+}
+html[data-look="lines"][data-density="compact"] { --ln-pad: 3px; --base: 13px; --ln-stroke: 5px; }
+
+/* One-line menu along the top */
+html[data-look="lines"] .app { display: block; }
+html[data-look="lines"] .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 22px; padding: 12px clamp(16px, 4vw, 40px) 10px; margin: 0; border-right: 0; border-bottom: 1px solid var(--fg-strong); background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="lines"] .brand { padding: 0; gap: 0; }
+html[data-look="lines"] .brand-mark { display: none; }
+html[data-look="lines"] .brand-name { font: 600 15px/1.2 var(--font-body); color: var(--fg-strong); letter-spacing: 0; }
+html[data-look="lines"] .nav { flex: 1 1 auto; flex-direction: row; flex-wrap: wrap; gap: 2px 18px; align-items: baseline; }
+html[data-look="lines"] .nav-group { display: none; }
+html[data-look="lines"] .nav a { gap: 0; padding: 2px 0; border-radius: 0; font-size: 14px; font-weight: 400; background: transparent; box-shadow: none; }
+html[data-look="lines"] .nav a > svg { display: none; }
+html[data-look="lines"] .nav a:hover { background: transparent; text-decoration: underline; text-underline-offset: 4px; }
+html[data-look="lines"] .nav a[aria-current="page"] { background: transparent; color: var(--fg-strong); box-shadow: none; font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+html[data-look="lines"] .nav .badge { margin-left: 6px; position: static; border-radius: 0; }
+html[data-look="lines"] .side-foot { margin-top: 0; flex-direction: row; align-items: baseline; gap: 14px; }
+html[data-look="lines"] .auth-status { padding: 0; }
+/* the Sidebar "icons only" setting is retired here: the words stay */
+html[data-look="lines"][data-sidebar="icons"] .lbl { display: inline; }
+html[data-look="lines"][data-sidebar="icons"] .brand-name,
+html[data-look="lines"][data-sidebar="icons"] .auth-status { display: inline; }
+html[data-look="lines"][data-sidebar="icons"] .side { padding-inline: clamp(16px, 4vw, 40px); align-items: baseline; }
+html[data-look="lines"][data-sidebar="icons"] .nav a { justify-content: flex-start; }
+
+/* Top bar, buttons, inputs: square, plain */
+html[data-look="lines"] .top { padding: 8px clamp(16px, 4vw, 40px); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="lines"] .icon-btn { border-radius: 0; background: transparent; }
+html[data-look="lines"] .search input { border-radius: 0; }
+html[data-look="lines"] .btn,
+html[data-look="lines"] .ops-btn { border-radius: 0; font-weight: 400; }
+html[data-look="lines"] input,
+html[data-look="lines"] select,
+html[data-look="lines"] textarea { border-radius: 0; }
+
+/* The page: one sheet column at 92 % of the page colour, so a background shows at the edges */
+html[data-look="lines"] .content { max-width: 1040px; margin-inline: auto; padding: 8px clamp(16px, 4vw, 40px) 64px; background: color-mix(in srgb, var(--bg) 92%, transparent); }
+html[data-look="lines"] .page-head { margin: 16px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+html[data-look="lines"] .page-head h1 { font: 600 clamp(24px, 4vw, 34px)/1.1 var(--font-body); letter-spacing: -.01em; }
+html[data-look="lines"] .widgets { display: block; }
+html[data-look="lines"] .w { margin: 0 0 var(--row-gap); }
+html[data-look="lines"] .w:not(.lift) { border-top: 1px solid var(--line); padding-top: 12px; }
+html[data-look="lines"] .lift { background: transparent; border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; padding-top: 12px; }
+html[data-look="lines"] .need { padding: 0; }
+html[data-look="lines"] .need li { padding: var(--need-pad) 0; border-top: 1px solid var(--line); }
+html[data-look="lines"] .need li:first-child { border-top: 0; }
+html[data-look="lines"] .need b { font-weight: 600; }
+html[data-look="lines"] .need-head h2,
+html[data-look="lines"] .sec-head h2,
+html[data-look="lines"] .st-head h2 { font: 600 14px/1.2 var(--font-body); letter-spacing: 0; }
+html[data-look="lines"] .spine { padding-left: 0; }
+html[data-look="lines"] .spine::before { display: none; }
+html[data-look="lines"] .spine li { padding: 8px 0; border-top: 1px solid var(--line); }
+html[data-look="lines"] .spine li::before { display: none; }
+
+/* The Overview's default opening and blocks give way to the map while the renderer has drawn */
+html[data-look="lines"][data-look-drawn="overview"] .hero,
+html[data-look="lines"][data-look-drawn="overview"] .widgets [data-w="need"],
+html[data-look="lines"][data-look-drawn="overview"] .widgets [data-w="feed"],
+html[data-look="lines"][data-look-drawn="overview"] .widgets [data-w="flight"] { display: none; }
+
+/* Other blocks: flat, square, no shadow */
+html[data-look="lines"] .box,
+html[data-look="lines"] .ops-tile,
+html[data-look="lines"] .ops-list,
+html[data-look="lines"] .ops-panel,
+html[data-look="lines"] .ops-gate,
+html[data-look="lines"] .ops-onboard,
+html[data-look="lines"] .ops-setup,
+html[data-look="lines"] .ops-needs,
+html[data-look="lines"] .ops-pc-card,
+html[data-look="lines"] .ops-pc-file,
+html[data-look="lines"] .ops-code,
+html[data-look="lines"] .ops-run-box,
+html[data-look="lines"] .ops-conn,
+html[data-look="lines"] .ops-notice,
+html[data-look="lines"] .ops-banner,
+html[data-look="lines"] .ops-reveal,
+html[data-look="lines"] .ops-toast,
+html[data-look="lines"] .tl-stat,
+html[data-look="lines"] .tl-approval,
+html[data-look="lines"] .tk-rows,
+html[data-look="lines"] .tk-totals,
+html[data-look="lines"] .tk-msg,
+html[data-look="lines"] .tk-accept { border-radius: 0; box-shadow: none; }
+html[data-look="lines"] .ops-tabs,
+html[data-look="lines"] .ops-tab,
+html[data-look="lines"] .ops-filter,
+html[data-look="lines"] .ops-fold,
+html[data-look="lines"] .ops-step::before,
+html[data-look="lines"] .tl-bar { border-radius: 0; }
+html[data-look="lines"] .ops-tab[aria-selected="true"],
+html[data-look="lines"] .ops-tab[aria-pressed="true"] { box-shadow: none; border-bottom: 2px solid var(--fg-strong); }
+
+/* State: a word and a shape, never colour alone */
+html[data-look="lines"] .chip,
+html[data-look="lines"] .ops-chip,
+html[data-look="lines"] .tl-pill { border-radius: 0; background: transparent; border-color: currentColor; font-weight: 400; }
+html[data-look="lines"] .chip.alert,
+html[data-look="lines"] .chip.attn { font-weight: 600; }
+html[data-look="lines"] .chip.ok::before { content: "\25CF"; }
+html[data-look="lines"] .chip.attn::before { content: "\25C6"; }
+html[data-look="lines"] .chip.alert::before { content: "\2297"; }
+html[data-look="lines"] .chip.info::before { content: "\25CB"; }
+html[data-look="lines"] .st i,
+html[data-look="lines"] .live::before,
+html[data-look="lines"] .live-dot { border-radius: 0; }
+
+/* The Overview, as the renderer draws it. Line colours: accent, attn, strong text, dim text (a fifth would repeat the first). */
+html[data-look="lines"] .look-mount { margin: 0 0 var(--row-gap); }
+html[data-look="lines"] .ln-sheet { padding-top: 6px; }
+html[data-look="lines"] .ln-open { margin: 14px 0 18px; font: 400 var(--ln-open)/1.3 var(--font-body); color: var(--fg-strong); max-width: 40em; }
+html[data-look="lines"] .ln-c0 { --ln-colour: var(--accent); }
+html[data-look="lines"] .ln-c1 { --ln-colour: var(--attn); }
+html[data-look="lines"] .ln-c2 { --ln-colour: var(--fg-strong); }
+html[data-look="lines"] .ln-c3 { --ln-colour: var(--fg-dim); }
+
+/* status board: three ruled rows, bullet | line name | one sentence */
+html[data-look="lines"] .ln-board { list-style: none; margin: 0 0 22px; padding: 0; border-top: 1px solid var(--fg-strong); }
+html[data-look="lines"] .ln-boardrow { display: grid; grid-template-columns: 30px 9.5rem minmax(0, 1fr); column-gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: var(--base); line-height: 1.4; }
+html[data-look="lines"] .ln-roundel { display: grid; place-items: center; width: 26px; height: 26px; box-sizing: border-box; border: 4px solid var(--ln-colour); border-radius: 50%; background: var(--bg); color: var(--fg-strong); font: 600 12px/1 var(--font-body); }
+html[data-look="lines"] .ln-boardname { font-weight: 600; color: var(--fg-strong); }
+html[data-look="lines"] .ln-boardtext { color: var(--fg); }
+
+/* the map: straight runs, one per line; scrolls sideways on a narrow window rather than shrinking the type */
+html[data-look="lines"] .ln-map { overflow-x: auto; margin: 0 0 8px; }
+html[data-look="lines"] .ln-map:focus-visible { outline: 3px solid var(--fg-strong); outline-offset: 2px; }
+html[data-look="lines"] .ln-svg { display: block; width: 100%; min-width: 760px; height: auto; }
+html[data-look="lines"] .ln-seg { stroke: var(--ln-colour); stroke-width: var(--ln-stroke); stroke-linecap: butt; fill: none; }
+html[data-look="lines"] .ln-seg-plan { stroke-dasharray: 10 8; }
+html[data-look="lines"] .ln-ring { fill: var(--bg); stroke: var(--ln-colour); stroke-width: 4; }
+html[data-look="lines"] .ln-dashed { stroke-dasharray: 4 3; stroke: var(--fg-strong); }
+html[data-look="lines"] .ln-fill { fill: var(--fg-strong); }
+html[data-look="lines"] .ln-cross { stroke: var(--fg-strong); stroke-width: 2.5; fill: none; }
+html[data-look="lines"] .ln-inter { fill: none; stroke: var(--fg-strong); stroke-width: 2; }
+html[data-look="lines"] .ln-bullet-ring { fill: var(--bg); stroke: var(--ln-colour); stroke-width: 5; }
+html[data-look="lines"] .ln-bullet-letter { fill: var(--fg-strong); font: 600 15px/1 var(--font-body); }
+html[data-look="lines"] .ln-line-name { fill: var(--fg-dim); font: 400 12px/1 var(--font-body); }
+html[data-look="lines"] .ln-lbl { fill: var(--fg); font: 400 13px/1 var(--font-body); }
+html[data-look="lines"] .ln-name { fill: var(--fg-strong); font-weight: 600; }
+html[data-look="lines"] .ln-word { fill: var(--fg-dim); }
+html[data-look="lines"] a.ln-stop { cursor: pointer; }
+html[data-look="lines"] a.ln-stop:hover .ln-name { text-decoration: underline; }
+html[data-look="lines"] a.ln-stop:focus-visible { outline: 3px solid var(--fg-strong); outline-offset: 2px; }
+html[data-look="lines"] .ln-key { margin: 6px 0 26px; max-width: 52em; color: var(--fg-dim); font-size: 13px; line-height: 1.5; }
+
+/* the plain lists: Needs you, Changes today, Coming up */
+html[data-look="lines"] .ln-block { margin: 0 0 22px; border-top: 1px solid var(--fg-strong); padding-top: 10px; }
+html[data-look="lines"] .ln-head { margin: 0 0 6px; font: 600 14px/1.3 var(--font-body); color: var(--fg-strong); }
+html[data-look="lines"] .ln-rows { list-style: none; margin: 0; padding: 0; }
+html[data-look="lines"] .ln-row { display: grid; grid-template-columns: var(--ln-time) minmax(0, 1fr) minmax(0, 14rem); column-gap: 12px; align-items: baseline; padding: var(--ln-pad) 0; border-top: 1px solid var(--line); font-size: var(--base); line-height: 1.4; }
+html[data-look="lines"] .ln-row:first-child { border-top: 0; }
+html[data-look="lines"] .ln-time { font: 400 12.5px/1.6 var(--font-mono); color: var(--fg-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+html[data-look="lines"] .ln-rowtext { min-width: 0; overflow-wrap: anywhere; }
+html[data-look="lines"] .ln-side { text-align: right; color: var(--fg-dim); font-size: 13px; overflow-wrap: anywhere; }
+html[data-look="lines"] .ln-link { color: var(--fg-strong); text-decoration: none; }
+html[data-look="lines"] .ln-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+html[data-look="lines"] .ln-empty { margin: 0; color: var(--fg-dim); }
+html[data-look="lines"] .ln-act { margin-left: 14px; font: 400 13px/1.2 var(--font-body); padding: 0; border: 0; border-bottom: 1px solid var(--fg-strong); background: transparent; color: var(--fg-strong); border-radius: 0; cursor: pointer; }
+html[data-look="lines"] .ln-act:hover { background: var(--fg-strong); color: var(--bg); }
+
+/* Narrow windows: back to the shell's bottom bar; the lists stack */
+@media (max-width: 860px) {
+  html[data-look="lines"] .app { display: grid; }
+  html[data-look="lines"] .side { position: fixed; inset: auto 0 0 0; z-index: 20; flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; gap: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--fg-strong); border-bottom: 0; background: var(--bg); }
+  html[data-look="lines"] .nav { flex-wrap: nowrap; gap: 0; width: 100%; justify-content: space-around; }
+  html[data-look="lines"] .nav a,
+  html[data-look="lines"][data-sidebar="icons"] .nav a { flex-direction: column; justify-content: center; gap: 2px; padding: 6px 8px; min-width: 56px; font-size: 11px; font-weight: 400; }
+  html[data-look="lines"] .nav a > svg { display: inline-block; }
+  html[data-look="lines"] .nav a[aria-current="page"] { text-decoration: none; font-weight: 600; }
+  html[data-look="lines"] .top,
+  html[data-look="lines"] .content { padding-inline: 16px; }
+  html[data-look="lines"] .content { padding-bottom: 96px; }
+  html[data-look="lines"] .ln-boardrow { grid-template-columns: 30px minmax(0, 1fr); }
+  html[data-look="lines"] .ln-boardtext { grid-column: 2; }
+  html[data-look="lines"] .ln-row { grid-template-columns: 4.5rem minmax(0, 1fr); }
+  html[data-look="lines"] .ln-side { grid-column: 2; text-align: left; }
+  html[data-look="lines"] .ln-side:empty { display: none; }
+}
+
+/* Keyboard focus */
+html[data-look="lines"] :focus-visible { outline: 3px solid var(--fg-strong); outline-offset: 2px; }

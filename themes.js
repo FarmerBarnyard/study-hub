@@ -99,15 +99,15 @@
     // ----
     { id: "classic-desktop", name: "Classic Desktop", blurb: "A 2000s desktop application with window frames.", group: "apps", installed: true, renderer: false, v: "df45d759", jv: "00000000", sketch: "2,2,96,96,q;2,2,96,8,a;2,11,96,5,q;4,19,26,70,p;32,19,64,32,l;34,22,60,26,p;32,55,64,34,l;34,58,60,28,p;2,92,96,5,q" },
     // ----
-    { id: "day-line", name: "Day Line", blurb: "Everything placed on a time line.", group: "maps", installed: false, renderer: true, v: "00000000", jv: "00000000", sketch: "18,6,2,88,l;14,18,10,6,a;26,19,60,2,d;14,42,10,6,d;26,43,50,2,d;14,66,10,6,d;26,67,64,2,d;8,56,76,2,n" },
+    { id: "day-line", name: "Day Line", blurb: "Everything placed on a time line.", group: "maps", installed: true, renderer: true, v: "df23f275", jv: "ca2bfea9", sketch: "18,6,2,88,l;14,18,10,6,a;26,19,60,2,d;14,42,10,6,d;26,43,50,2,d;14,66,10,6,d;26,67,64,2,d;8,56,76,2,n" },
     // ----
     { id: "drawing-register", name: "Drawing Register", blurb: "A framed drawing sheet with ruled schedules.", group: "documents", installed: true, renderer: false, v: "84a15fd5", jv: "00000000", sketch: "4,4,92,92,l;6,6,88,88,p;58,74,36,20,q;60,78,32,2,d;60,85,22,2,d;10,12,50,3,s;10,26,44,2,d;10,38,50,2,d" },
     // ----
-    { id: "grid-9", name: "Grid 9", blurb: "A strict Swiss grid: one typeface, hairline rules.", group: "maps", installed: false, renderer: true, v: "00000000", jv: "00000000", sketch: "0,0,100,2,l;4,8,92,18,s;4,34,28,2,d;36,34,28,2,d;68,34,28,2,d;4,44,28,22,q;36,44,28,22,q;68,44,28,22,q;4,74,92,2,l" },
+    { id: "grid-9", name: "Grid 9", blurb: "A strict Swiss grid: one typeface, hairline rules.", group: "maps", installed: true, renderer: true, v: "ded3886a", jv: "8474172e", sketch: "0,0,100,2,l;4,8,92,18,s;4,34,28,2,d;36,34,28,2,d;68,34,28,2,d;4,44,28,22,q;36,44,28,22,q;68,44,28,22,q;4,74,92,2,l" },
     // ----
     { id: "lab-book", name: "Lab Book", blurb: "A ruled notebook page with index tabs on the edge.", group: "documents", installed: true, renderer: false, v: "9cbda9b9", jv: "00000000", sketch: "0,0,100,100,p;14,0,2,100,n;20,14,72,2,l;20,30,72,2,l;20,46,72,2,l;20,62,72,2,l;20,78,72,2,l;22,8,30,3,s" },
     // ----
-    { id: "lines", name: "Lines", blurb: "A transit map of your systems and projects.", group: "maps", installed: false, renderer: true, v: "00000000", jv: "00000000", sketch: "6,26,88,5,s;6,56,88,5,a;6,82,60,5,d;14,22,10,12,q;42,22,10,12,q;72,22,10,12,q;24,52,10,12,q;60,52,10,12,q" },
+    { id: "lines", name: "Lines", blurb: "A transit map of your systems and projects.", group: "maps", installed: true, renderer: true, v: "6beea888", jv: "a1768ab2", sketch: "6,26,88,5,s;6,56,88,5,a;6,82,60,5,d;14,22,10,12,q;42,22,10,12,q;72,22,10,12,q;24,52,10,12,q;60,52,10,12,q" },
     // ----
     { id: "mailroom", name: "Mailroom", blurb: "An email client: folders, a list, a reading pane.", group: "apps", installed: true, renderer: false, v: "33c4cdd9", jv: "00000000", sketch: "0,0,18,100,q;3,10,12,3,s;3,18,12,2,d;3,24,12,2,d;3,30,12,2,d;18,0,1,100,l;21,8,24,3,s;21,16,24,2,d;21,26,24,3,s;21,34,24,2,d;21,44,24,3,s;50,0,1,100,l;55,10,36,5,s;55,22,38,2,d;55,30,34,2,d;55,40,30,2,d" },
     // ----
