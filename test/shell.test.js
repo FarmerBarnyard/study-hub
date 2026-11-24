@@ -104,7 +104,7 @@ test("normalize does not share state with the defaults", function () {
 test("cookie: look-and-feel keys round-trip", function () {
   var s = Theme.normalize({ theme: "orchid", mode: "system", bg: "radar", bgs: "subtle", density: "compact", sidebar: "icons" });
   var back = Theme.decodePrefs(Theme.encodePrefs(s));
-  assert.deepStrictEqual(back, { theme: "orchid", mode: "system", bg: "radar", bgs: "subtle", density: "compact", sidebar: "icons" });
+  assert.deepStrictEqual(back, { theme: "orchid", look: "original", mode: "system", bg: "radar", bgs: "subtle", density: "compact", sidebar: "icons" });
 });
 
 test("cookie: anything that does not validate is ignored, and layout keys never travel", function () {

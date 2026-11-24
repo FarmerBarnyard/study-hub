@@ -1,9 +1,10 @@
 // Themes and personal settings for every barnyard.site page.
 //
 // What this file owns:
-//   - the 18 colour themes (each with a light and a dark set), and the 18
-//     page backgrounds the Settings panel offers;
-//   - the settings object (theme, light/dark mode, background, density,
+//   - the 18 colour themes (each with a light and a dark set), the 18
+//     page backgrounds and the page looks (structure, type and wording) the
+//     Settings panel offers;
+//   - the settings object (theme, look, light/dark mode, background, density,
 //     sidebar, Overview widget layout, Ops board defaults), its validation,
 //     and where it is kept;
 //   - applying the choice to the page (CSS custom properties and attributes
@@ -17,7 +18,7 @@
 //   - localStorage "barnyard-settings": everything, per browser.
 //   - cookie "bh_prefs" (Domain=.barnyard.site): only the look-and-feel keys,
 //     so choosing a theme on one site carries to dashboard/study/campaign/
-//     stocks. It holds no identity, only six short preference codes, and every
+//     stocks. It holds no identity, only seven short preference codes, and every
 //     value read back from it is checked against the lists below before use.
 //   - the signed-in user's profile (api.barnyard.site/prefs): everything, so it
 //     follows the person to any browser. See "saving to the signed-in user's
@@ -76,6 +77,81 @@
   ];
   var BACKGROUND_GROUPS = [["light", "Soft light"], ["pattern", "Lines and patterns"], ["ring", "Rings and rays"]];
 
+  // ---- the page looks ---------------------------------------------------------------------------------------------
+  // A look is how the pages are laid out and worded: structure, type, icons, wording. It sits UNDER the colour theme,
+  // background, density and sidebar, which apply on top of every look. docs/looks.md is the author guide.
+  //
+  // THE REGISTRY: one entry per line, in id order after Original, a comment line between entries so that two people adding
+  // looks in parallel never edit neighbouring lines (git then merges them with no conflict). A person adding a look edits
+  // ONLY the line of their look here, plus their own files in look-layers/. Fields:
+  //   id         short slug (a-z, 0-9, -), the saved value and the file names look-layers/<id>.css and <id>.js
+  //   name, blurb  what the Settings gallery shows
+  //   group      a family for the author guide: original | documents | apps | maps | text
+  //   installed  true once look-layers/<id>.css is built and merged; false = drawn but not built (shown, not selectable)
+  //   renderer   true if the look needs its own markup for some pages (look-layers/<id>.js registers renderers, see below)
+  //   v, jv      cache versions of the .css and .js: tools/stamp-assets.js rewrites them from the files; never edit by hand
+  //   sketch     the gallery preview: rectangles in percent, "x,y,w,h,tone;" with tone p panel, q panel-2, l line, a accent,
+  //              d fg-dim, s fg-strong, n needs-you; drawn in the theme's own colours (no image files)
+  // A saved look that is unknown, or not installed, reads as Original (never an error).
+  var LOOKS = [
+    // ----
+    { id: "original", name: "Original", blurb: "The look the dashboard has today.", group: "original", installed: true, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,22,100,p;28,10,30,34,q;62,10,30,34,q;28,52,64,38,q;31,15,14,3,s;65,15,14,3,s" },
+    // ----
+    { id: "classic-desktop", name: "Classic Desktop", blurb: "A 2000s desktop application with window frames.", group: "apps", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "2,2,96,96,q;2,2,96,12,a;2,16,96,8,p;4,28,28,60,p;34,28,62,60,p;4,92,92,5,p" },
+    // ----
+    { id: "day-line", name: "Day Line", blurb: "Everything placed on a time line.", group: "maps", installed: false, renderer: true, v: "00000000", jv: "00000000", sketch: "18,6,2,88,l;14,18,10,6,a;26,19,60,2,d;14,42,10,6,d;26,43,50,2,d;14,66,10,6,d;26,67,64,2,d;8,56,76,2,n" },
+    // ----
+    { id: "drawing-register", name: "Drawing Register", blurb: "A framed drawing sheet with a title block.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "4,4,92,92,l;6,6,88,88,p;58,74,36,20,q;60,78,32,2,d;60,85,22,2,d;10,12,50,3,s;10,26,44,2,d;10,38,50,2,d" },
+    // ----
+    { id: "grid-9", name: "Grid 9", blurb: "A strict Swiss grid: one typeface, hairline rules.", group: "maps", installed: false, renderer: true, v: "00000000", jv: "00000000", sketch: "0,0,100,2,l;4,8,92,18,s;4,34,28,2,d;36,34,28,2,d;68,34,28,2,d;4,44,28,22,q;36,44,28,22,q;68,44,28,22,q;4,74,92,2,l" },
+    // ----
+    { id: "lab-book", name: "Lab Book", blurb: "A dated notebook with a margin column.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,100,100,p;14,0,2,100,n;20,14,72,2,l;20,30,72,2,l;20,46,72,2,l;20,62,72,2,l;20,78,72,2,l;22,8,30,3,s" },
+    // ----
+    { id: "lines", name: "Lines", blurb: "A transit map of your systems and projects.", group: "maps", installed: false, renderer: true, v: "00000000", jv: "00000000", sketch: "6,26,88,5,s;6,56,88,5,a;6,82,60,5,d;14,22,10,12,q;42,22,10,12,q;72,22,10,12,q;24,52,10,12,q;60,52,10,12,q" },
+    // ----
+    { id: "mailroom", name: "Mailroom", blurb: "An email client: folders, a list, a reading pane.", group: "apps", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,20,100,p;22,0,34,100,q;58,0,42,100,p;24,8,30,4,s;24,24,30,4,d;24,40,30,4,d;62,10,34,4,s;62,24,32,2,d;62,34,30,2,d" },
+    // ----
+    { id: "paper-terminal", name: "Paper Terminal", blurb: "A text-mode screen in paper and ink, no neon.", group: "text", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "3,3,94,94,l;5,5,90,90,p;8,9,60,3,s;8,22,84,6,s;8,34,70,2,d;8,44,60,2,d;8,54,66,2,d;5,88,90,7,s" },
+    // ----
+    { id: "plain-window", name: "Plain Window", blurb: "A native admin tool: a list pane, ruled blocks, system type.", group: "apps", installed: true, renderer: false, v: "b42949f7", jv: "00000000", sketch: "0,0,22,100,q;3,10,16,5,s;3,20,16,2,d;3,26,16,2,d;3,32,16,2,d;26,6,40,6,l;26,18,70,2,d;26,26,70,14,p;26,44,70,14,p;26,62,70,14,p" },
+    // ----
+    { id: "poster", name: "Poster", blurb: "One big sentence over a plain ruled list.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "10,10,80,14,s;10,30,60,4,d;10,48,80,2,l;10,60,80,2,l;10,72,80,2,l;10,84,80,2,l" },
+    // ----
+    { id: "prompt", name: "Prompt", blurb: "Command first: type what you want.", group: "text", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "10,10,80,16,q;14,15,40,4,s;10,38,80,2,l;10,50,60,3,d;10,62,70,3,d;10,74,50,3,d;10,86,40,3,d" },
+    // ----
+    { id: "raw", name: "Raw", blurb: "Deliberately plain: browser-default HTML.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "6,6,88,5,s;6,22,60,2,s;6,32,70,2,s;6,42,40,2,s;6,56,88,3,l;6,70,88,3,l" },
+    // ----
+    { id: "run-sheet", name: "Run Sheet", blurb: "A printed day sheet, with times down the side.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "6,6,12,88,q;24,12,70,2,d;24,26,70,2,d;24,38,46,8,a;24,40,70,2,d;24,54,70,2,d;24,68,70,2,d;24,82,70,2,d" },
+    // ----
+    { id: "sheet", name: "Sheet", blurb: "A spreadsheet workbook with tabs and a formula bar.", group: "apps", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,100,10,q;0,10,14,90,q;14,34,86,2,l;14,58,86,2,l;14,82,86,2,l;38,10,2,90,l;62,10,2,90,l;40,36,22,22,a" },
+    // ----
+    { id: "shift-log", name: "Shift Log", blurb: "A text-first hand-over log: one column, no cards.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "20,8,60,5,s;14,24,3,3,a;20,24,60,2,d;20,34,52,2,d;20,44,60,2,d;20,54,44,2,d;20,68,60,2,d;20,78,36,2,d" },
+    // ----
+    { id: "switchboard", name: "Switchboard", blurb: "Titled panes with a top tab strip.", group: "apps", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,100,12,s;4,3,14,6,a;4,18,44,36,q;52,18,44,36,q;4,58,44,36,q;52,58,44,36,q" },
+    // ----
+    { id: "wiki", name: "Wiki", blurb: "A living runbook: page tree, article, contents.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,22,100,p;26,8,50,6,s;26,24,50,2,d;26,34,50,2,d;26,44,40,2,d;26,58,50,2,d;80,8,18,2,d;80,18,18,2,d;80,28,18,2,d" }
+    // ----
+  ];
+  var LOOK_STATES = [["installed", "Installed"], ["designed", "Designed, not built yet"]];
+  var LOOK_GROUPS = ["original", "documents", "apps", "maps", "text"];
+  var TONES = { p: "--panel", q: "--panel-2", l: "--line", a: "--accent", d: "--fg-dim", s: "--fg-strong", n: "--attn" };
+  var SKETCH = /^(?:\d{1,3},\d{1,3},\d{1,3},\d{1,3},[pqladsn])(?:;\d{1,3},\d{1,3},\d{1,3},\d{1,3},[pqladsn]){0,19}$/;
+  var LAYER_DIR = "/look-layers/";   // root-absolute: every site serves its own copy of the layers at its own root
+  var LOOK_GIVE_UP_MS = 3000;        // if a layer cannot be fetched the page shows anyway, as Original
+
+  function findLook(id) { for (var i = 0; i < LOOKS.length; i++) if (LOOKS[i].id === id) return LOOKS[i]; return null; }
+  // "x,y,w,h,t;..." -> [{x, y, w, h, tone, colour}] in percent, or [] when it is not well formed.
+  function parseSketch(text) {
+    if (typeof text !== "string" || !SKETCH.test(text)) return [];
+    return text.split(";").map(function (r) { var p = r.split(","); return { x: +p[0], y: +p[1], w: +p[2], h: +p[3], tone: p[4], colour: TONES[p[4]] }; });
+  }
+  // The gallery's two sections: installed looks (selectable) and looks that are only drawn so far.
+  function lookSections() {
+    return LOOK_STATES.map(function (s) {
+      return { key: s[0], title: s[1], looks: LOOKS.filter(function (l) { return (l.installed ? "installed" : "designed") === s[0]; }) };
+    }).filter(function (s) { return s.looks.length; });
+  }
+
   // The Overview's widgets, in default order. size: 1, 2 or 4 columns.
   var WIDGET_IDS = ["need", "feed", "flight", "market", "weather", "week", "todo", "links"];
   var DEFAULT_WIDGETS = [
@@ -96,7 +172,7 @@
 
   function defaults() {
     return {
-      theme: "amber", mode: "dark", bg: "plain", bgs: "medium", density: "comfortable", sidebar: "full",
+      theme: "amber", look: "original", mode: "dark", bg: "plain", bgs: "medium", density: "comfortable", sidebar: "full",
       widgets: DEFAULT_WIDGETS.map(function (w) { return { id: w.id, visible: w.visible, size: w.size }; }),
       board: null, boardSets: null,
       opsLayout: "board", foldBacklog: null
@@ -151,6 +227,8 @@
     var out = defaults();
     if (!raw || typeof raw !== "object") return out;
     if (typeof raw.theme === "string" && findTheme(raw.theme)) out.theme = raw.theme;
+    // A look that is unknown, or drawn but not built yet, reads as Original (never an error).
+    if (typeof raw.look === "string" && findLook(raw.look) && findLook(raw.look).installed) out.look = raw.look;
     out.mode = oneOf(MODES, raw.mode, out.mode);
     if (typeof raw.bg === "string" && hasBackground(raw.bg)) out.bg = raw.bg;
     out.bgs = oneOf(STRENGTHS, raw.bgs, out.bgs);
@@ -178,7 +256,7 @@
 
   // ---- the shared look-and-feel cookie --------------------------------------
 
-  var COOKIE_KEYS = { t: "theme", m: "mode", b: "bg", s: "bgs", d: "density", sb: "sidebar" };
+  var COOKIE_KEYS = { t: "theme", l: "look", m: "mode", b: "bg", s: "bgs", d: "density", sb: "sidebar" };
 
   function encodePrefs(settings) {
     var parts = [];
@@ -281,7 +359,62 @@
     el.setAttribute("data-sidebar", s.sidebar);
     el.setAttribute("data-bg", s.bg);
     el.setAttribute("data-bgs", s.bgs);
+    applyLook(s.look);
   }
+
+  // ---- a look's layer ------------------------------------------------------------------------------------------------
+  // Sets data-look on <html> and, for any look but Original, fetches that look's layer once: look-layers/<id>.css and, when
+  // the registry says renderer: true, look-layers/<id>.js (which registers its page renderers). Original loads nothing, so the
+  // current look is byte for byte what it was. Until the layer has loaded (or failed, or 3 seconds have passed)
+  // data-look-pending hides the body (shell.css), so a returning visitor never sees the Original layout flash first. A layer
+  // that cannot load leaves the page showing as Original: every look rule is scoped to html[data-look="<id>"] and nothing
+  // else depends on it.
+  var fetched = {}, waiting = 0, readyCallbacks = [], rendererTable = {};
+  function lookSettled() {
+    var el = root.document && root.document.documentElement;
+    if (waiting > 0) return;
+    if (el) el.removeAttribute("data-look-pending");
+    var cbs = readyCallbacks; readyCallbacks = [];
+    for (var i = 0; i < cbs.length; i++) { try { cbs[i](); } catch (e) { /* one callback must not stop the rest */ } }
+  }
+  function fetchLayer(doc, kind, entry) {
+    var el = kind === "css" ? doc.createElement("link") : doc.createElement("script");
+    var done = false;
+    var finish = function () { if (done) return; done = true; waiting--; lookSettled(); };
+    if (kind === "css") { el.rel = "stylesheet"; el.href = LAYER_DIR + entry.id + ".css?v=" + entry.v; }
+    else { el.src = LAYER_DIR + entry.id + ".js?v=" + entry.jv; el.async = true; }
+    el.addEventListener("load", finish);
+    el.addEventListener("error", finish);
+    waiting++;
+    doc.head.appendChild(el);
+    root.setTimeout(finish, LOOK_GIVE_UP_MS);
+  }
+  function applyLook(look) {
+    var doc = root.document, el = doc && doc.documentElement;
+    if (!el) return;
+    var entry = findLook(look);
+    if (!entry || !entry.installed) entry = findLook("original");
+    el.setAttribute("data-look", entry.id);
+    if (entry.id === "original") { if (waiting === 0) el.removeAttribute("data-look-pending"); lookSettled(); return; }
+    if (fetched[entry.id] || !doc.head || typeof doc.createElement !== "function") return;
+    fetched[entry.id] = true;
+    el.setAttribute("data-look-pending", "1");
+    fetchLayer(doc, "css", entry);
+    if (entry.renderer) fetchLayer(doc, "js", entry);
+  }
+  // A look that needs its own markup for a page (renderer: true) registers one function per page from its look-layers/<id>.js:
+  //   BarnyardTheme.look.register("grid-9", "overview", function (model, mount) { ... draw into mount ... });
+  // and the page's own script, where it draws, asks `var r = BarnyardTheme.look.renderer("overview")` and calls r(model, mount)
+  // instead of its default drawing when r is not null. whenReady(fn) runs fn once the look's layer has loaded (at once for Original).
+  function registerRenderer(lookId, pageId, fn) {
+    if (typeof lookId !== "string" || typeof pageId !== "string" || typeof fn !== "function") return;
+    (rendererTable[lookId] = rendererTable[lookId] || {})[pageId] = fn;
+  }
+  function rendererFor(pageId) {
+    var table = rendererTable[current.look];
+    return table && typeof table[pageId] === "function" ? table[pageId] : null;
+  }
+  function whenLookReady(fn) { if (typeof fn !== "function") return; if (waiting === 0) fn(); else readyCallbacks.push(fn); }
 
   function notify() { for (var i = 0; i < listeners.length; i++) { try { listeners[i](current); } catch (e) { /* one listener must not stop the rest */ } } }
 
@@ -607,6 +740,8 @@
 
   var api = {
     THEMES: THEMES, THEME_GROUPS: THEME_GROUPS, BACKGROUNDS: BACKGROUNDS, BACKGROUND_GROUPS: BACKGROUND_GROUPS,
+    LOOKS: LOOKS, LOOK_GROUPS: LOOK_GROUPS, LOOK_STATES: LOOK_STATES, LAYER_DIR: LAYER_DIR, findLook: findLook, parseSketch: parseSketch, lookSections: lookSections,
+    look: { register: registerRenderer, renderer: rendererFor, whenReady: whenLookReady },
     WIDGET_IDS: WIDGET_IDS, DEFAULT_WIDGETS: DEFAULT_WIDGETS, COLOUR_VARS: COLOUR_VARS,
     defaults: defaults, normalize: normalize, encodePrefs: encodePrefs, decodePrefs: decodePrefs,
     contrastRatio: contrastRatio, findTheme: findTheme, themeColours: themeColours, isDark: isDark,
