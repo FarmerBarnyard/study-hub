@@ -1,0 +1,138 @@
+/* Look Q "Classic Desktop": a 1990s-2000s desktop application done with restraint: a tree-pane sidebar with an accent selected row, group boxes with a
+   legend, sunken list fields, raised buttons, a title bar over each page. Bevels are box-shadows (no images); every colour is a theme variable, so the
+   default feel is a slate window face with an accent title bar, and the other themes recolour it.
+   Left out of this layer (needs markup, not styling): the window frame around the whole app, the menu bar, the toolbar and the bottom status bar
+   of the mock-up, and the Display Properties dialog. The title bar here is the page's own heading.
+   Sidebar setting: "full" = text tree, "icons" = icon-only tree. Every rule is scoped to html[data-look="classic-desktop"]. */
+
+/* contrast: --fg on --panel-2; --fg-strong on --panel-2; --fg-dim on --panel-2; --fg on --panel; --fg-dim on --panel; --accent-ink on --accent; --fg-strong on --panel */
+
+html[data-look="classic-desktop"] {
+  --font-display: Tahoma, "Segoe UI", Verdana, Geneva, system-ui, sans-serif;
+  --font-body: Tahoma, "Segoe UI", Verdana, Geneva, system-ui, sans-serif;
+  --lift: none;
+  --base: 13.5px;
+}
+
+/* Tree pane: a sunken white list */
+html[data-look="classic-desktop"] .side { gap: 10px; padding: 10px 6px; background: var(--panel-2); backdrop-filter: none; -webkit-backdrop-filter: none; border-right: 2px solid var(--line); }
+html[data-look="classic-desktop"] .brand { padding: 0 4px; gap: 6px; }
+html[data-look="classic-desktop"] .brand-mark { width: 20px; height: 20px; border-radius: 0; font: 700 12px var(--font-display); }
+html[data-look="classic-desktop"] .brand-name { font: 700 14px/1 var(--font-display); letter-spacing: 0; color: var(--fg-strong); }
+html[data-look="classic-desktop"] .nav { gap: 0; padding: 4px 0; background: var(--panel); box-shadow: inset 1px 1px 0 var(--fg-dim), inset -1px -1px 0 var(--line), inset 2px 2px 0 var(--line); }
+html[data-look="classic-desktop"] .nav-group { margin: 8px 6px 2px; font-size: 11px; font-weight: 700; letter-spacing: 0; color: var(--fg-dim); }
+html[data-look="classic-desktop"] .nav a { gap: 6px; padding: 2px 8px; border-radius: 0; font-weight: 400; color: var(--fg); }
+html[data-look="classic-desktop"] .nav a > svg:first-child { display: none; }
+html[data-look="classic-desktop"][data-sidebar="icons"] .nav a > svg:first-child { display: inline-block; }
+html[data-look="classic-desktop"] .nav a:hover { background: var(--panel-2); color: var(--fg-strong); }
+html[data-look="classic-desktop"] .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); box-shadow: none; font-weight: 400; }
+html[data-look="classic-desktop"] .nav a[aria-current="page"] svg:first-child { color: inherit; }
+html[data-look="classic-desktop"] .nav .badge { border-radius: 0; }
+
+/* Top bar: the menu strip. Raised, flat face */
+html[data-look="classic-desktop"] .top { background: var(--panel-2); backdrop-filter: none; -webkit-backdrop-filter: none; padding: 6px 20px; border-bottom: 2px solid var(--line); box-shadow: inset 0 1px 0 var(--panel); }
+
+/* Buttons: raised, square; pressed = inset */
+html[data-look="classic-desktop"] .icon-btn,
+html[data-look="classic-desktop"] .btn,
+html[data-look="classic-desktop"] .ops-btn { border-radius: 0; border: 1px solid var(--fg-dim); background: var(--panel-2); color: var(--fg-strong); box-shadow: inset 1px 1px 0 var(--panel), inset -1px -1px 0 var(--line); font-weight: 400; }
+html[data-look="classic-desktop"] .icon-btn { width: 30px; height: 30px; }
+html[data-look="classic-desktop"] .btn,
+html[data-look="classic-desktop"] .ops-btn { height: 28px; padding: 0 12px; }
+html[data-look="classic-desktop"] .btn-sm { height: 24px; padding: 0 9px; }
+html[data-look="classic-desktop"] .icon-btn:active,
+html[data-look="classic-desktop"] .btn:active,
+html[data-look="classic-desktop"] .ops-btn:active { box-shadow: inset 1px 1px 0 var(--line), inset -1px -1px 0 var(--panel); }
+html[data-look="classic-desktop"] .icon-btn:hover,
+html[data-look="classic-desktop"] .btn:hover,
+html[data-look="classic-desktop"] .ops-btn:hover { background: var(--panel); }
+html[data-look="classic-desktop"] input,
+html[data-look="classic-desktop"] select,
+html[data-look="classic-desktop"] textarea { border-radius: 0; background: var(--panel); box-shadow: inset 1px 1px 0 var(--fg-dim), inset -1px -1px 0 var(--line); border: 1px solid var(--line); }
+html[data-look="classic-desktop"] .search input { height: 28px; border-radius: 0; }
+
+/* Page: the window body; the heading is the title bar */
+html[data-look="classic-desktop"] .content { padding: 8px 20px 48px; }
+html[data-look="classic-desktop"] .page-head { margin: 8px 0 12px; display: block; }
+html[data-look="classic-desktop"] .page-head h1,
+html[data-look="classic-desktop"] .hero h1 { display: block; margin: 0; padding: 3px 8px; font: 700 14px/1.4 var(--font-display); letter-spacing: 0; background: var(--accent); color: var(--accent-ink); text-wrap: auto; }
+html[data-look="classic-desktop"] .page-head p { margin-top: 6px; }
+html[data-look="classic-desktop"] .hero { margin: 8px 0 var(--hero-gap); max-width: none; }
+html[data-look="classic-desktop"] .hero p { margin-top: 6px; font-size: 13px; }
+
+/* Group boxes: a grooved frame; the heading is a bold legend row ruled underneath; list fields inside are sunken */
+html[data-look="classic-desktop"] .widgets { gap: 18px 14px; }
+html[data-look="classic-desktop"] .w,
+html[data-look="classic-desktop"] .w.lift,
+html[data-look="classic-desktop"] .w:not(.lift) { padding: 8px; border: 2px groove var(--line); border-radius: 0; box-shadow: none; background: transparent; }
+html[data-look="classic-desktop"] .w > .need-head,
+html[data-look="classic-desktop"] .w > .sec-head { margin: 0 0 8px; padding: 0 0 4px; border-bottom: 1px solid var(--line); color: var(--fg-strong); }
+html[data-look="classic-desktop"] .w > .need-head h2,
+html[data-look="classic-desktop"] .w > .sec-head h2 { font: 700 13px/1.3 var(--font-display); letter-spacing: 0; color: inherit; }
+html[data-look="classic-desktop"] .w > .need-head a,
+html[data-look="classic-desktop"] .w > .sec-head a,
+html[data-look="classic-desktop"] .w > .sec-head .sub { color: inherit; text-decoration: underline; margin-left: 10px; }
+html[data-look="classic-desktop"] .need,
+html[data-look="classic-desktop"] .spine,
+html[data-look="classic-desktop"] .todo-list { background: var(--panel); color: var(--fg); box-shadow: inset 1px 1px 0 var(--fg-dim), inset -1px -1px 0 var(--line), inset 2px 2px 0 var(--line); padding: 4px; }
+html[data-look="classic-desktop"] .need b { font-size: 13.5px; }
+
+/* Other blocks: square, no shadow, a sunken or grooved edge */
+html[data-look="classic-desktop"] .box,
+html[data-look="classic-desktop"] .ops-tile,
+html[data-look="classic-desktop"] .ops-list,
+html[data-look="classic-desktop"] .ops-panel,
+html[data-look="classic-desktop"] .ops-gate,
+html[data-look="classic-desktop"] .ops-onboard,
+html[data-look="classic-desktop"] .ops-setup,
+html[data-look="classic-desktop"] .ops-needs,
+html[data-look="classic-desktop"] .ops-pc-card,
+html[data-look="classic-desktop"] .ops-pc-file,
+html[data-look="classic-desktop"] .ops-code,
+html[data-look="classic-desktop"] .ops-run-box,
+html[data-look="classic-desktop"] .ops-conn,
+html[data-look="classic-desktop"] .ops-notice,
+html[data-look="classic-desktop"] .ops-banner,
+html[data-look="classic-desktop"] .ops-reveal,
+html[data-look="classic-desktop"] .ops-toast,
+html[data-look="classic-desktop"] .tl-stat,
+html[data-look="classic-desktop"] .tl-approval,
+html[data-look="classic-desktop"] .tk-rows,
+html[data-look="classic-desktop"] .tk-totals,
+html[data-look="classic-desktop"] .tk-msg,
+html[data-look="classic-desktop"] .tk-accept { border-radius: 0; box-shadow: none; border: 2px groove var(--line); }
+html[data-look="classic-desktop"] .ops-tabs,
+html[data-look="classic-desktop"] .ops-tab,
+html[data-look="classic-desktop"] .ops-filter,
+html[data-look="classic-desktop"] .ops-fold,
+html[data-look="classic-desktop"] .ops-step::before { border-radius: 0; }
+html[data-look="classic-desktop"] .ops-tab[aria-selected="true"],
+html[data-look="classic-desktop"] .ops-tab[aria-pressed="true"] { box-shadow: none; border-bottom: 2px solid var(--accent); }
+html[data-look="classic-desktop"] .ops-log-row::before { border-radius: 0; box-shadow: none; }
+html[data-look="classic-desktop"] .tl-bar { border-radius: 0; }
+html[data-look="classic-desktop"] .tl-bar::-webkit-progress-value { border-radius: 0; }
+html[data-look="classic-desktop"] .tl-bar::-moz-progress-bar { border-radius: 0; }
+
+/* State: a word plus a small square or shape */
+html[data-look="classic-desktop"] .chip,
+html[data-look="classic-desktop"] .ops-chip,
+html[data-look="classic-desktop"] .tl-pill { border-radius: 0; background: transparent; border-color: currentColor; font-weight: 400; }
+html[data-look="classic-desktop"] .chip.ok::before { content: "\25A0"; }
+html[data-look="classic-desktop"] .chip.attn::before { content: "\25C6"; }
+html[data-look="classic-desktop"] .chip.alert::before { content: "\25B2"; }
+html[data-look="classic-desktop"] .chip.info::before { content: "\25CF"; }
+html[data-look="classic-desktop"] .st i,
+html[data-look="classic-desktop"] .live::before,
+html[data-look="classic-desktop"] .live-dot { border-radius: 0; }
+
+/* Narrow windows: the shell's own bottom bar (icon over label) is kept */
+@media (max-width: 860px) {
+  html[data-look="classic-desktop"] .side { padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); gap: 0; border-right: 0; border-top: 2px solid var(--line); }
+  html[data-look="classic-desktop"] .nav { padding: 0; background: transparent; box-shadow: none; }
+  html[data-look="classic-desktop"] .nav a { gap: 2px; padding: 6px 8px; }
+  html[data-look="classic-desktop"] .nav a > svg:first-child { display: inline-block; }
+  html[data-look="classic-desktop"] .content { padding: 8px 14px 96px; }
+}
+
+/* Keyboard focus: the classic dotted rectangle, made solid for contrast */
+html[data-look="classic-desktop"] :focus-visible { outline: 1px dotted var(--fg-strong); outline-offset: -3px; box-shadow: 0 0 0 2px var(--fg-strong); }

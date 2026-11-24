@@ -1,0 +1,125 @@
+/* Look A "Shift Log": a text-first hand-over log. One column of plain text under a quiet text-only menu, no boxes: blocks are separated by a
+   single rule, tables have an ink rule under the header and hairlines between rows, state is a small square plus its word.
+   A pure CSS layer on the page's own markup (see docs/looks.md). Not in this layer: the mock-up's dated "log" wording and its top line of
+   date and shift (they need markup or copy changes, left out rather than faked).
+   Every rule is scoped to html[data-look="shift-log"]; every colour is a theme variable. */
+
+/* contrast: --fg on --bg; --fg-strong on --bg; --fg-dim on --bg; --fg-strong on --panel-2; --fg on --panel-2 */
+
+html[data-look="shift-log"] {
+  --font-display: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --lift: none;
+  --base: 14.5px;
+}
+
+/* Sidebar: plain words, no icons, no panel */
+html[data-look="shift-log"] .side { gap: 18px; padding: 22px 16px 16px; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border-right: 1px solid var(--line); }
+html[data-look="shift-log"] .brand { padding: 0; gap: 8px; }
+html[data-look="shift-log"] .brand-mark { width: 14px; height: 14px; border-radius: 0; font-size: 0; }
+html[data-look="shift-log"] .brand-name { font: 600 17px/1.1 var(--font-display); letter-spacing: 0; color: var(--fg-strong); }
+html[data-look="shift-log"] .nav { gap: 1px; }
+html[data-look="shift-log"] .nav-group { margin: 14px 0 4px; padding: 0; font-size: 12.5px; letter-spacing: 0; text-transform: none; }
+html[data-look="shift-log"] .nav a { gap: 8px; padding: 4px 0; border-radius: 0; background: transparent; box-shadow: none; font-weight: 400; color: var(--fg-dim); }
+html[data-look="shift-log"] .nav a > svg:first-child { display: none; }
+html[data-look="shift-log"][data-sidebar="icons"] .nav a > svg:first-child { display: inline-block; }
+html[data-look="shift-log"] .nav a:hover { background: transparent; color: var(--fg-strong); text-decoration: underline; }
+html[data-look="shift-log"] .nav a[aria-current="page"] { background: transparent; box-shadow: none; color: var(--fg-strong); font-weight: 600; }
+html[data-look="shift-log"] .nav a[aria-current="page"] svg:first-child { color: inherit; }
+html[data-look="shift-log"] .nav .badge { border-radius: 0; background: transparent; color: var(--fg-strong); font-variant-numeric: tabular-nums; }
+
+/* Top bar, buttons, inputs: flat, thin lines */
+html[data-look="shift-log"] .icon-btn { border-radius: 3px; }
+html[data-look="shift-log"] .search input { border-radius: 3px; }
+html[data-look="shift-log"] .btn,
+html[data-look="shift-log"] .ops-btn { border-radius: 3px; box-shadow: none; font-weight: 500; }
+html[data-look="shift-log"] input,
+html[data-look="shift-log"] select,
+html[data-look="shift-log"] textarea { border-radius: 3px; }
+
+/* Page: one narrow column, flush left */
+html[data-look="shift-log"] .content { padding: 22px 36px 56px; max-width: 960px; }
+html[data-look="shift-log"] .page-head { margin: 4px 0 22px; padding-bottom: 8px; border-bottom: 1px solid var(--fg-strong); }
+html[data-look="shift-log"] .page-head h1 { font: 650 21px/1.3 var(--font-display); letter-spacing: -.005em; text-wrap: balance; }
+html[data-look="shift-log"] .page-head p { margin-top: 4px; }
+html[data-look="shift-log"] .hero { margin: 0 0 var(--hero-gap); max-width: 46ch; }
+html[data-look="shift-log"] .hero h1 { font: 500 21px/1.38 var(--font-display); letter-spacing: -.005em; color: var(--fg-strong); }
+html[data-look="shift-log"] .hero p { margin-top: 6px; font-size: 14.5px; }
+html[data-look="shift-log"] .need-head h2,
+html[data-look="shift-log"] .st-head h2,
+html[data-look="shift-log"] .sec-head h2,
+html[data-look="shift-log"] .w h2 { font: 600 13.5px/1.3 var(--font-display); letter-spacing: 0; text-transform: none; color: var(--fg-strong); }
+html[data-look="shift-log"] .need b { font-size: 14.5px; font-weight: 500; }
+
+/* Blocks: no boxes. A block is text under one thin rule. */
+html[data-look="shift-log"] .lift,
+html[data-look="shift-log"] .box,
+html[data-look="shift-log"] .ops-tile,
+html[data-look="shift-log"] .ops-list,
+html[data-look="shift-log"] .ops-panel,
+html[data-look="shift-log"] .ops-gate,
+html[data-look="shift-log"] .ops-onboard,
+html[data-look="shift-log"] .ops-setup,
+html[data-look="shift-log"] .ops-needs,
+html[data-look="shift-log"] .ops-pc-card,
+html[data-look="shift-log"] .ops-pc-file,
+html[data-look="shift-log"] .ops-code,
+html[data-look="shift-log"] .ops-run-box,
+html[data-look="shift-log"] .ops-conn,
+html[data-look="shift-log"] .ops-notice,
+html[data-look="shift-log"] .ops-banner,
+html[data-look="shift-log"] .ops-reveal,
+html[data-look="shift-log"] .tl-stat,
+html[data-look="shift-log"] .tl-approval,
+html[data-look="shift-log"] .tk-rows,
+html[data-look="shift-log"] .tk-totals,
+html[data-look="shift-log"] .tk-msg,
+html[data-look="shift-log"] .tk-accept { background: transparent; border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; }
+html[data-look="shift-log"] .ops-toast { border-radius: 3px; box-shadow: none; }
+html[data-look="shift-log"] .ops-tabs,
+html[data-look="shift-log"] .ops-tab,
+html[data-look="shift-log"] .ops-filter,
+html[data-look="shift-log"] .ops-fold,
+html[data-look="shift-log"] .ops-step::before { border-radius: 0; }
+html[data-look="shift-log"] .ops-tab[aria-selected="true"],
+html[data-look="shift-log"] .ops-tab[aria-pressed="true"] { box-shadow: none; border-bottom: 2px solid var(--fg-strong); }
+html[data-look="shift-log"] .w:not(.lift) { padding-top: 12px; }
+html[data-look="shift-log"] .need { padding: 0; }
+html[data-look="shift-log"] .need li { padding: 9px 0; }
+html[data-look="shift-log"] .ops-log-row::before { border-radius: 0; box-shadow: none; }
+html[data-look="shift-log"] .tl-bar { border-radius: 0; }
+html[data-look="shift-log"] .tl-bar::-webkit-progress-value { border-radius: 0; }
+html[data-look="shift-log"] .tl-bar::-moz-progress-bar { border-radius: 0; }
+
+/* Tables read like a ledger: an ink rule under the header, hairlines between rows */
+html[data-look="shift-log"] table { border-collapse: collapse; }
+html[data-look="shift-log"] th { font-weight: 400; font-size: 12.5px; color: var(--fg-dim); border-bottom: 1px solid var(--fg-strong); }
+html[data-look="shift-log"] td { border-bottom: 1px solid var(--line); }
+html[data-look="shift-log"] td,
+html[data-look="shift-log"] th { font-variant-numeric: tabular-nums; }
+
+/* State: a small square and its word, never colour alone */
+html[data-look="shift-log"] .chip,
+html[data-look="shift-log"] .ops-chip,
+html[data-look="shift-log"] .tl-pill { border-radius: 0; background: transparent; border-color: transparent; padding-left: 0; padding-right: 0; font-weight: 400; color: var(--fg); }
+html[data-look="shift-log"] .chip::before,
+html[data-look="shift-log"] .ops-chip::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 6px; background: var(--fg-dim); border-radius: 0; }
+html[data-look="shift-log"] .chip.ok::before { background: var(--fg-dim); }
+html[data-look="shift-log"] .chip.attn::before { background: var(--attn); }
+html[data-look="shift-log"] .chip.alert::before { background: var(--fg-strong); }
+html[data-look="shift-log"] .chip.info::before,
+html[data-look="shift-log"] .chip.accent::before { background: var(--accent); }
+html[data-look="shift-log"] .st i,
+html[data-look="shift-log"] .live::before,
+html[data-look="shift-log"] .live-dot { border-radius: 0; }
+
+/* Narrow windows: the shell's bottom bar keeps its icon-over-label items */
+@media (max-width: 860px) {
+  html[data-look="shift-log"] .side { padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); gap: 0; border-right: 0; border-top: 1px solid var(--line); }
+  html[data-look="shift-log"] .nav a { gap: 2px; padding: 6px 8px; }
+  html[data-look="shift-log"] .nav a > svg:first-child { display: inline-block; }
+  html[data-look="shift-log"] .content { padding: 12px 16px 96px; }
+}
+
+/* Keyboard focus */
+html[data-look="shift-log"] :focus-visible { outline: 2px solid var(--fg-strong); outline-offset: 2px; }

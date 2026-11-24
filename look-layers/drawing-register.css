@@ -1,0 +1,135 @@
+/* Look F "Drawing Register": the page is a drawing sheet: a double frame, the menu as a ruled strip of cells, and every block a
+   ruled schedule, the way an engineer lists doors or valves. Plex Mono for the figures, hairline rules, square corners, no shadows.
+   A pure CSS layer on the page's own markup.
+   The menu becomes a ruled strip inside the frame (the mock-up has no sidebar): the Sidebar setting is retired for this look
+   (the control stays and is harmless; "icons only" still shows words). On a narrow window the shell's own bottom bar is restored.
+   Not in this layer: the title block (project, sheet, date) in the top right of the mock-up: it needs new markup, so it is left
+   out rather than faked.
+   Every rule is scoped to html[data-look="drawing-register"]; every colour is a theme variable. */
+
+/* contrast: --fg on --panel; --fg-strong on --panel; --fg-dim on --panel; --fg-dim on --panel-2; --fg on --panel-2; --fg-strong on --panel-2; --bg on --fg-strong */
+
+html[data-look="drawing-register"] {
+  --font-display: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-body: var(--font-mono);
+  --lift: none;
+  --base: 12.5px;
+}
+html[data-look="drawing-register"][data-density="compact"] { --base: 12px; --row-gap: 12px; --col-gap: 12px; }
+
+/* The sheet: a double frame on a plain desk */
+html[data-look="drawing-register"] .app { display: block; margin: 12px; padding: 14px 16px 18px; background: var(--panel); border: 2px solid var(--fg); outline: 1px solid var(--fg); outline-offset: -6px; min-height: calc(100vh - 24px); }
+html[data-look="drawing-register"] .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 0 0 10px; border-right: 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="drawing-register"] .brand { padding: 0; gap: 0; }
+html[data-look="drawing-register"] .brand-mark { display: none; }
+html[data-look="drawing-register"] .brand-name { font: 600 20px/1.2 var(--font-display); letter-spacing: 0; color: var(--fg-strong); }
+html[data-look="drawing-register"] .nav { flex: 1 1 auto; flex-direction: row; flex-wrap: wrap; gap: 0; border: 1px solid var(--fg); }
+html[data-look="drawing-register"] .nav-group { display: none; }
+html[data-look="drawing-register"] .nav a { gap: 0; padding: 3px 12px; border-radius: 0; border-right: 1px solid var(--fg); font-weight: 400; background: transparent; box-shadow: none; }
+html[data-look="drawing-register"] .nav a > svg { display: none; }
+html[data-look="drawing-register"] .nav a:hover { background: var(--panel-2); }
+html[data-look="drawing-register"] .nav a[aria-current="page"] { background: var(--fg-strong); color: var(--bg); box-shadow: none; font-weight: 600; }
+html[data-look="drawing-register"] .nav .badge { position: static; margin-left: 8px; border-radius: 0; }
+html[data-look="drawing-register"] .side-foot { margin-top: 0; flex-direction: row; align-items: center; gap: 10px; }
+html[data-look="drawing-register"] .auth-status { padding: 0; }
+/* the Sidebar "icons only" setting is retired here: the words stay */
+html[data-look="drawing-register"][data-sidebar="icons"] .lbl { display: inline; }
+html[data-look="drawing-register"][data-sidebar="icons"] .brand-name,
+html[data-look="drawing-register"][data-sidebar="icons"] .auth-status { display: inline; }
+html[data-look="drawing-register"][data-sidebar="icons"] .side { padding-inline: 0; align-items: center; }
+html[data-look="drawing-register"][data-sidebar="icons"] .nav a { justify-content: flex-start; }
+
+/* Top bar, buttons, inputs: square, ruled */
+html[data-look="drawing-register"] .top { padding: 6px 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="drawing-register"] .icon-btn { border-radius: 0; }
+html[data-look="drawing-register"] .search input { border-radius: 0; }
+html[data-look="drawing-register"] .btn,
+html[data-look="drawing-register"] .ops-btn { border-radius: 0; font-weight: 400; }
+html[data-look="drawing-register"] input,
+html[data-look="drawing-register"] select,
+html[data-look="drawing-register"] textarea { border-radius: 0; }
+
+/* The page and its schedules */
+html[data-look="drawing-register"] .content { padding: 0 0 24px; max-width: none; }
+html[data-look="drawing-register"] .page-head { margin: 8px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--fg); }
+html[data-look="drawing-register"] .page-head h1 { font: 600 20px/1.2 var(--font-display); letter-spacing: 0; }
+html[data-look="drawing-register"] .hero { margin: 8px 0 12px; max-width: none; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+html[data-look="drawing-register"] .hero h1 { font: 600 clamp(20px, 2.6vw, 26px)/1.2 var(--font-display); letter-spacing: 0; }
+html[data-look="drawing-register"] .hero p { margin-top: 4px; font-size: 12.5px; }
+html[data-look="drawing-register"] .widgets { gap: 12px 14px; }
+html[data-look="drawing-register"] .w,
+html[data-look="drawing-register"] .w:not(.lift) { border: 1px solid var(--fg-dim); padding: 8px 10px 10px; background: transparent; box-shadow: none; border-radius: 0; }
+html[data-look="drawing-register"] .lift { background: transparent; box-shadow: none; border-radius: 0; }
+html[data-look="drawing-register"] .need { padding: 0; }
+html[data-look="drawing-register"] .need li { padding: var(--need-pad) 0; border-top: 1px solid var(--line); }
+html[data-look="drawing-register"] .need li:first-child { border-top: 0; }
+html[data-look="drawing-register"] .need b { font-size: 13px; }
+html[data-look="drawing-register"] .need-head { padding: 0 0 6px; border-bottom: 1px solid var(--fg-dim); margin-bottom: 4px; }
+html[data-look="drawing-register"] .need-head h2,
+html[data-look="drawing-register"] .sec-head h2,
+html[data-look="drawing-register"] .st-head h2 { font: 600 14px/1.2 var(--font-display); letter-spacing: 0; }
+html[data-look="drawing-register"] .sec-head { padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--fg-dim); }
+html[data-look="drawing-register"] .spine { padding-left: 0; }
+html[data-look="drawing-register"] .spine::before { display: none; }
+html[data-look="drawing-register"] .spine li { padding: 4px 0; border-top: 1px solid var(--line); }
+html[data-look="drawing-register"] .spine li::before { display: none; }
+
+/* Other blocks: ruled, square, no shadow */
+html[data-look="drawing-register"] .box,
+html[data-look="drawing-register"] .ops-tile,
+html[data-look="drawing-register"] .ops-list,
+html[data-look="drawing-register"] .ops-panel,
+html[data-look="drawing-register"] .ops-gate,
+html[data-look="drawing-register"] .ops-onboard,
+html[data-look="drawing-register"] .ops-setup,
+html[data-look="drawing-register"] .ops-needs,
+html[data-look="drawing-register"] .ops-pc-card,
+html[data-look="drawing-register"] .ops-pc-file,
+html[data-look="drawing-register"] .ops-code,
+html[data-look="drawing-register"] .ops-run-box,
+html[data-look="drawing-register"] .ops-conn,
+html[data-look="drawing-register"] .ops-notice,
+html[data-look="drawing-register"] .ops-banner,
+html[data-look="drawing-register"] .ops-reveal,
+html[data-look="drawing-register"] .ops-toast,
+html[data-look="drawing-register"] .tl-stat,
+html[data-look="drawing-register"] .tl-approval,
+html[data-look="drawing-register"] .tk-rows,
+html[data-look="drawing-register"] .tk-totals,
+html[data-look="drawing-register"] .tk-msg,
+html[data-look="drawing-register"] .tk-accept { border-radius: 0; box-shadow: none; }
+html[data-look="drawing-register"] .ops-tabs,
+html[data-look="drawing-register"] .ops-tab,
+html[data-look="drawing-register"] .ops-filter,
+html[data-look="drawing-register"] .ops-fold,
+html[data-look="drawing-register"] .ops-step::before,
+html[data-look="drawing-register"] .tl-bar { border-radius: 0; }
+html[data-look="drawing-register"] .ops-tab[aria-selected="true"],
+html[data-look="drawing-register"] .ops-tab[aria-pressed="true"] { box-shadow: none; border-bottom: 2px solid var(--fg-strong); }
+
+/* State: a word and a square mark, never colour alone */
+html[data-look="drawing-register"] .chip,
+html[data-look="drawing-register"] .ops-chip,
+html[data-look="drawing-register"] .tl-pill { border-radius: 0; background: transparent; border-color: currentColor; font-weight: 500; }
+html[data-look="drawing-register"] .chip.ok::before { content: "\25A1"; }
+html[data-look="drawing-register"] .chip.attn::before { content: "\25A0"; }
+html[data-look="drawing-register"] .chip.alert::before { content: "\25B2"; }
+html[data-look="drawing-register"] .chip.info::before { content: "\25CF"; }
+html[data-look="drawing-register"] .st i,
+html[data-look="drawing-register"] .live::before,
+html[data-look="drawing-register"] .live-dot { border-radius: 0; }
+
+/* Narrow windows: back to the shell's bottom bar, a thinner frame */
+@media (max-width: 860px) {
+  html[data-look="drawing-register"] .app { display: grid; margin: 6px; padding: 10px 10px 90px; }
+  html[data-look="drawing-register"] .side { position: fixed; inset: auto 0 0 0; z-index: 20; flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; gap: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--bg); }
+  html[data-look="drawing-register"] .nav { flex-wrap: nowrap; width: 100%; justify-content: space-around; border: 0; }
+  html[data-look="drawing-register"] .nav a,
+  html[data-look="drawing-register"][data-sidebar="icons"] .nav a { flex-direction: column; justify-content: center; gap: 2px; padding: 6px 8px; min-width: 56px; font-size: 11px; border-right: 0; }
+  html[data-look="drawing-register"] .nav a > svg { display: inline-block; }
+  html[data-look="drawing-register"] .top,
+  html[data-look="drawing-register"] .content { padding-inline: 0; }
+}
+
+/* Keyboard focus */
+html[data-look="drawing-register"] :focus-visible { outline: 2px solid var(--fg-strong); outline-offset: 1px; }

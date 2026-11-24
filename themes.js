@@ -97,39 +97,39 @@
     // ----
     { id: "original", name: "Original", blurb: "The look the dashboard has today.", group: "original", installed: true, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,22,100,p;28,10,30,34,q;62,10,30,34,q;28,52,64,38,q;31,15,14,3,s;65,15,14,3,s" },
     // ----
-    { id: "classic-desktop", name: "Classic Desktop", blurb: "A 2000s desktop application with window frames.", group: "apps", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "2,2,96,96,q;2,2,96,12,a;2,16,96,8,p;4,28,28,60,p;34,28,62,60,p;4,92,92,5,p" },
+    { id: "classic-desktop", name: "Classic Desktop", blurb: "A 2000s desktop application with window frames.", group: "apps", installed: true, renderer: false, v: "df45d759", jv: "00000000", sketch: "2,2,96,96,q;2,2,96,8,a;2,11,96,5,q;4,19,26,70,p;32,19,64,32,l;34,22,60,26,p;32,55,64,34,l;34,58,60,28,p;2,92,96,5,q" },
     // ----
     { id: "day-line", name: "Day Line", blurb: "Everything placed on a time line.", group: "maps", installed: false, renderer: true, v: "00000000", jv: "00000000", sketch: "18,6,2,88,l;14,18,10,6,a;26,19,60,2,d;14,42,10,6,d;26,43,50,2,d;14,66,10,6,d;26,67,64,2,d;8,56,76,2,n" },
     // ----
-    { id: "drawing-register", name: "Drawing Register", blurb: "A framed drawing sheet with a title block.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "4,4,92,92,l;6,6,88,88,p;58,74,36,20,q;60,78,32,2,d;60,85,22,2,d;10,12,50,3,s;10,26,44,2,d;10,38,50,2,d" },
+    { id: "drawing-register", name: "Drawing Register", blurb: "A framed drawing sheet with ruled schedules.", group: "documents", installed: true, renderer: false, v: "84a15fd5", jv: "00000000", sketch: "4,4,92,92,l;6,6,88,88,p;58,74,36,20,q;60,78,32,2,d;60,85,22,2,d;10,12,50,3,s;10,26,44,2,d;10,38,50,2,d" },
     // ----
     { id: "grid-9", name: "Grid 9", blurb: "A strict Swiss grid: one typeface, hairline rules.", group: "maps", installed: false, renderer: true, v: "00000000", jv: "00000000", sketch: "0,0,100,2,l;4,8,92,18,s;4,34,28,2,d;36,34,28,2,d;68,34,28,2,d;4,44,28,22,q;36,44,28,22,q;68,44,28,22,q;4,74,92,2,l" },
     // ----
-    { id: "lab-book", name: "Lab Book", blurb: "A dated notebook with a margin column.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,100,100,p;14,0,2,100,n;20,14,72,2,l;20,30,72,2,l;20,46,72,2,l;20,62,72,2,l;20,78,72,2,l;22,8,30,3,s" },
+    { id: "lab-book", name: "Lab Book", blurb: "A ruled notebook page with index tabs on the edge.", group: "documents", installed: true, renderer: false, v: "9cbda9b9", jv: "00000000", sketch: "0,0,100,100,p;14,0,2,100,n;20,14,72,2,l;20,30,72,2,l;20,46,72,2,l;20,62,72,2,l;20,78,72,2,l;22,8,30,3,s" },
     // ----
     { id: "lines", name: "Lines", blurb: "A transit map of your systems and projects.", group: "maps", installed: false, renderer: true, v: "00000000", jv: "00000000", sketch: "6,26,88,5,s;6,56,88,5,a;6,82,60,5,d;14,22,10,12,q;42,22,10,12,q;72,22,10,12,q;24,52,10,12,q;60,52,10,12,q" },
     // ----
-    { id: "mailroom", name: "Mailroom", blurb: "An email client: folders, a list, a reading pane.", group: "apps", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,20,100,p;22,0,34,100,q;58,0,42,100,p;24,8,30,4,s;24,24,30,4,d;24,40,30,4,d;62,10,34,4,s;62,24,32,2,d;62,34,30,2,d" },
+    { id: "mailroom", name: "Mailroom", blurb: "An email client: folders, a list, a reading pane.", group: "apps", installed: true, renderer: false, v: "33c4cdd9", jv: "00000000", sketch: "0,0,18,100,q;3,10,12,3,s;3,18,12,2,d;3,24,12,2,d;3,30,12,2,d;18,0,1,100,l;21,8,24,3,s;21,16,24,2,d;21,26,24,3,s;21,34,24,2,d;21,44,24,3,s;50,0,1,100,l;55,10,36,5,s;55,22,38,2,d;55,30,34,2,d;55,40,30,2,d" },
     // ----
-    { id: "paper-terminal", name: "Paper Terminal", blurb: "A text-mode screen in paper and ink, no neon.", group: "text", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "3,3,94,94,l;5,5,90,90,p;8,9,60,3,s;8,22,84,6,s;8,34,70,2,d;8,44,60,2,d;8,54,66,2,d;5,88,90,7,s" },
+    { id: "paper-terminal", name: "Paper Terminal", blurb: "A text-mode screen in paper and ink, no neon.", group: "text", installed: true, renderer: false, v: "9c69b8bc", jv: "00000000", sketch: "1,1,98,98,l;3,3,94,94,p;3,3,18,94,l;5,6,14,3,s;5,12,14,3,d;5,18,14,3,d;24,6,40,3,s;24,13,72,34,l;26,15,68,30,p;24,51,72,40,l;26,53,68,36,p" },
     // ----
     { id: "plain-window", name: "Plain Window", blurb: "A native admin tool: a list pane, ruled blocks, system type.", group: "apps", installed: true, renderer: false, v: "b42949f7", jv: "00000000", sketch: "0,0,22,100,q;3,10,16,5,s;3,20,16,2,d;3,26,16,2,d;3,32,16,2,d;26,6,40,6,l;26,18,70,2,d;26,26,70,14,p;26,44,70,14,p;26,62,70,14,p" },
     // ----
-    { id: "poster", name: "Poster", blurb: "One big sentence over a plain ruled list.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "10,10,80,14,s;10,30,60,4,d;10,48,80,2,l;10,60,80,2,l;10,72,80,2,l;10,84,80,2,l" },
+    { id: "poster", name: "Poster", blurb: "One big sentence over a plain ruled list.", group: "documents", installed: true, renderer: false, v: "9a3fc0cd", jv: "00000000", sketch: "6,4,60,3,s;72,4,22,3,d;4,10,92,1,s;8,20,76,12,s;8,36,50,4,d;4,50,92,2,s;8,58,60,5,s;4,68,92,1,l;8,74,50,5,s;4,84,92,1,l" },
     // ----
-    { id: "prompt", name: "Prompt", blurb: "Command first: type what you want.", group: "text", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "10,10,80,16,q;14,15,40,4,s;10,38,80,2,l;10,50,60,3,d;10,62,70,3,d;10,74,50,3,d;10,86,40,3,d" },
+    { id: "prompt", name: "Prompt", blurb: "Command first: type what you want.", group: "text", installed: true, renderer: false, v: "88c12ea0", jv: "00000000", sketch: "8,4,60,3,d;8,12,84,10,q;12,15,40,4,s;8,26,84,1,l;8,34,60,3,s;8,42,84,1,l;8,48,70,3,d;8,56,84,1,l;8,62,50,3,d;8,70,84,1,l;8,76,60,3,d;8,84,84,1,l" },
     // ----
-    { id: "raw", name: "Raw", blurb: "Deliberately plain: browser-default HTML.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "6,6,88,5,s;6,22,60,2,s;6,32,70,2,s;6,42,40,2,s;6,56,88,3,l;6,70,88,3,l" },
+    { id: "raw", name: "Raw", blurb: "Deliberately plain: browser-default HTML.", group: "documents", installed: true, renderer: false, v: "71a44121", jv: "00000000", sketch: "6,6,88,5,s;6,22,60,2,s;6,32,70,2,s;6,42,40,2,s;6,56,88,3,l;6,70,88,3,l" },
     // ----
-    { id: "run-sheet", name: "Run Sheet", blurb: "A printed day sheet, with times down the side.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "6,6,12,88,q;24,12,70,2,d;24,26,70,2,d;24,38,46,8,a;24,40,70,2,d;24,54,70,2,d;24,68,70,2,d;24,82,70,2,d" },
+    { id: "run-sheet", name: "Run Sheet", blurb: "A printed day sheet, with times down the side.", group: "documents", installed: true, renderer: false, v: "462fc2e9", jv: "00000000", sketch: "6,6,12,88,q;24,12,70,2,d;24,26,70,2,d;24,38,46,8,a;24,40,70,2,d;24,54,70,2,d;24,68,70,2,d;24,82,70,2,d" },
     // ----
-    { id: "sheet", name: "Sheet", blurb: "A spreadsheet workbook with tabs and a formula bar.", group: "apps", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,100,10,q;0,10,14,90,q;14,34,86,2,l;14,58,86,2,l;14,82,86,2,l;38,10,2,90,l;62,10,2,90,l;40,36,22,22,a" },
+    { id: "sheet", name: "Sheet", blurb: "A spreadsheet workbook with tabs and a formula bar.", group: "apps", installed: true, renderer: false, v: "b7c7e03a", jv: "00000000", sketch: "0,0,100,8,q;0,9,100,5,q;0,14,100,2,l;0,24,100,2,l;0,34,100,2,l;0,44,100,2,l;0,54,100,2,l;0,64,100,2,l;25,9,1,81,l;50,9,1,81,l;75,9,1,81,l;4,17,16,4,s;30,17,16,4,d;55,27,16,4,a;0,92,100,8,q;4,94,12,4,s;20,94,12,4,d" },
     // ----
-    { id: "shift-log", name: "Shift Log", blurb: "A text-first hand-over log: one column, no cards.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "20,8,60,5,s;14,24,3,3,a;20,24,60,2,d;20,34,52,2,d;20,44,60,2,d;20,54,44,2,d;20,68,60,2,d;20,78,36,2,d" },
+    { id: "shift-log", name: "Shift Log", blurb: "A text-first hand-over log: one column, no cards.", group: "documents", installed: true, renderer: false, v: "8b0b800e", jv: "00000000", sketch: "20,8,60,5,s;14,24,3,3,a;20,24,60,2,d;20,34,52,2,d;20,44,60,2,d;20,54,44,2,d;20,68,60,2,d;20,78,36,2,d" },
     // ----
-    { id: "switchboard", name: "Switchboard", blurb: "Titled panes with a top tab strip.", group: "apps", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,100,12,s;4,3,14,6,a;4,18,44,36,q;52,18,44,36,q;4,58,44,36,q;52,58,44,36,q" },
+    { id: "switchboard", name: "Switchboard", blurb: "Titled panes with a top tab strip.", group: "apps", installed: true, renderer: false, v: "1ffe6748", jv: "00000000", sketch: "0,0,100,9,s;3,2,10,5,a;16,2,10,5,p;28,2,10,5,p;4,14,44,6,s;4,20,44,30,p;52,14,44,6,s;52,20,44,30,p;4,56,44,6,s;4,62,44,32,p;52,56,44,6,s;52,62,44,32,p" },
     // ----
-    { id: "wiki", name: "Wiki", blurb: "A living runbook: page tree, article, contents.", group: "documents", installed: false, renderer: false, v: "00000000", jv: "00000000", sketch: "0,0,22,100,p;26,8,50,6,s;26,24,50,2,d;26,34,50,2,d;26,44,40,2,d;26,58,50,2,d;80,8,18,2,d;80,18,18,2,d;80,28,18,2,d" }
+    { id: "wiki", name: "Wiki", blurb: "A living runbook: page tree, article, contents.", group: "documents", installed: true, renderer: false, v: "a6e95a46", jv: "00000000", sketch: "0,0,22,100,q;3,10,14,3,s;5,18,12,2,d;5,24,12,2,d;5,30,12,2,d;5,36,12,2,d;26,8,50,6,s;26,16,60,1,l;26,24,60,3,d;26,34,60,3,d;26,44,50,3,d;26,52,60,1,l;26,60,60,3,d;26,70,40,3,d" }
     // ----
   ];
   var LOOK_STATES = [["installed", "Installed"], ["designed", "Designed, not built yet"]];
