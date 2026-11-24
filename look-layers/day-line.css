@@ -1,0 +1,202 @@
+/* Look J "Day Line": the page is a time axis. Everything sits where it happens, and a line marks now.
+   No cards, no boxes, no shadows, no icons. One typeface (the site's IBM Plex Sans), clock times in IBM Plex Mono. Shape plus words carry
+   state, never colour alone: circle = something happened, filled circle = finished, filled square = needs you, diamond = down or wrong,
+   dashed circle = planned. Bars in the left gutter run from when something went wrong until now: solid = down, dashed = degraded,
+   dotted = overdue.
+   The Overview is drawn by look-layers/day-line.js (one vertical axis) while html[data-look-drawn="overview"] is set; every other page keeps
+   its own markup, restyled here (flat, square, one typeface, a one-line menu along the top). The Sidebar setting is retired for this look.
+   Not in this layer: the Ops board as a table against a 12-day strip (the Ops page has no renderer hook: it keeps its own tiles).
+   Every rule is scoped to html[data-look="day-line"]; every colour is a theme variable. */
+
+/* contrast: --fg on --bg; --fg-strong on --bg; --fg-dim on --bg; --fg on --panel; --fg-strong on --panel; --fg-dim on --panel; --accent-ink on --accent */
+
+html[data-look="day-line"] {
+  --font-display: var(--font-body);
+  --lift: none;
+  --base: 14px;
+  --dl-open: clamp(20px, 3.4vw, 26px);
+  --dl-pad: 7px;
+  --dl-time: 5.75rem;
+}
+html[data-look="day-line"][data-density="compact"] { --dl-pad: 3px; --base: 13px; }
+
+/* One-line menu along the top */
+html[data-look="day-line"] .app { display: block; }
+html[data-look="day-line"] .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 22px; padding: 12px clamp(16px, 4vw, 40px) 10px; margin: 0; border-right: 0; border-bottom: 1px solid var(--fg-strong); background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="day-line"] .brand { padding: 0; gap: 0; }
+html[data-look="day-line"] .brand-mark { display: none; }
+html[data-look="day-line"] .brand-name { font: 600 15px/1.2 var(--font-body); color: var(--fg-strong); letter-spacing: 0; }
+html[data-look="day-line"] .nav { flex: 1 1 auto; flex-direction: row; flex-wrap: wrap; gap: 2px 18px; align-items: baseline; }
+html[data-look="day-line"] .nav-group { display: none; }
+html[data-look="day-line"] .nav a { gap: 0; padding: 2px 0; border-radius: 0; font-size: 14px; font-weight: 400; background: transparent; box-shadow: none; }
+html[data-look="day-line"] .nav a > svg { display: none; }
+html[data-look="day-line"] .nav a:hover { background: transparent; text-decoration: underline; text-underline-offset: 4px; }
+html[data-look="day-line"] .nav a[aria-current="page"] { background: transparent; color: var(--fg-strong); box-shadow: none; font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+html[data-look="day-line"] .nav .badge { margin-left: 6px; position: static; border-radius: 0; }
+html[data-look="day-line"] .side-foot { margin-top: 0; flex-direction: row; align-items: baseline; gap: 14px; }
+html[data-look="day-line"] .auth-status { padding: 0; }
+/* the Sidebar "icons only" setting is retired here: the words stay */
+html[data-look="day-line"][data-sidebar="icons"] .lbl { display: inline; }
+html[data-look="day-line"][data-sidebar="icons"] .brand-name,
+html[data-look="day-line"][data-sidebar="icons"] .auth-status { display: inline; }
+html[data-look="day-line"][data-sidebar="icons"] .side { padding-inline: clamp(16px, 4vw, 40px); align-items: baseline; }
+html[data-look="day-line"][data-sidebar="icons"] .nav a { justify-content: flex-start; }
+
+/* Top bar, buttons, inputs: square, plain */
+html[data-look="day-line"] .top { padding: 8px clamp(16px, 4vw, 40px); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="day-line"] .icon-btn { border-radius: 0; background: transparent; }
+html[data-look="day-line"] .search input { border-radius: 0; }
+html[data-look="day-line"] .btn,
+html[data-look="day-line"] .ops-btn { border-radius: 0; font-weight: 400; }
+html[data-look="day-line"] input,
+html[data-look="day-line"] select,
+html[data-look="day-line"] textarea { border-radius: 0; }
+
+/* The page: one translucent sheet column (the page colour at 90 %), so a background shows at the edges */
+html[data-look="day-line"] .content { max-width: 960px; margin-inline: auto; padding: 8px clamp(16px, 4vw, 40px) 64px; background: color-mix(in srgb, var(--bg) 90%, transparent); }
+html[data-look="day-line"] .page-head { margin: 16px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+html[data-look="day-line"] .page-head h1 { font: 600 clamp(24px, 4vw, 34px)/1.1 var(--font-body); letter-spacing: -.01em; }
+html[data-look="day-line"] .widgets { display: block; }
+html[data-look="day-line"] .w { margin: 0 0 var(--row-gap); }
+html[data-look="day-line"] .w:not(.lift) { border-top: 1px solid var(--line); padding-top: 12px; }
+html[data-look="day-line"] .lift { background: transparent; border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; padding-top: 12px; }
+html[data-look="day-line"] .need { padding: 0; }
+html[data-look="day-line"] .need li { padding: var(--need-pad) 0; border-top: 1px solid var(--line); }
+html[data-look="day-line"] .need li:first-child { border-top: 0; }
+html[data-look="day-line"] .need b { font-weight: 600; }
+html[data-look="day-line"] .need-head h2,
+html[data-look="day-line"] .sec-head h2,
+html[data-look="day-line"] .st-head h2 { font: 600 14px/1.2 var(--font-body); letter-spacing: 0; }
+html[data-look="day-line"] .spine { padding-left: 0; }
+html[data-look="day-line"] .spine::before { display: none; }
+html[data-look="day-line"] .spine li { padding: 8px 0; border-top: 1px solid var(--line); }
+html[data-look="day-line"] .spine li::before { display: none; }
+
+/* The Overview's default opening and blocks give way to the line while the renderer has drawn */
+html[data-look="day-line"][data-look-drawn="overview"] .hero,
+html[data-look="day-line"][data-look-drawn="overview"] .widgets [data-w="need"],
+html[data-look="day-line"][data-look-drawn="overview"] .widgets [data-w="feed"],
+html[data-look="day-line"][data-look-drawn="overview"] .widgets [data-w="flight"] { display: none; }
+
+/* Other blocks: flat, square, no shadow */
+html[data-look="day-line"] .box,
+html[data-look="day-line"] .ops-tile,
+html[data-look="day-line"] .ops-list,
+html[data-look="day-line"] .ops-panel,
+html[data-look="day-line"] .ops-gate,
+html[data-look="day-line"] .ops-onboard,
+html[data-look="day-line"] .ops-setup,
+html[data-look="day-line"] .ops-needs,
+html[data-look="day-line"] .ops-pc-card,
+html[data-look="day-line"] .ops-pc-file,
+html[data-look="day-line"] .ops-code,
+html[data-look="day-line"] .ops-run-box,
+html[data-look="day-line"] .ops-conn,
+html[data-look="day-line"] .ops-notice,
+html[data-look="day-line"] .ops-banner,
+html[data-look="day-line"] .ops-reveal,
+html[data-look="day-line"] .ops-toast,
+html[data-look="day-line"] .tl-stat,
+html[data-look="day-line"] .tl-approval,
+html[data-look="day-line"] .tk-rows,
+html[data-look="day-line"] .tk-totals,
+html[data-look="day-line"] .tk-msg,
+html[data-look="day-line"] .tk-accept { border-radius: 0; box-shadow: none; }
+html[data-look="day-line"] .ops-tabs,
+html[data-look="day-line"] .ops-tab,
+html[data-look="day-line"] .ops-filter,
+html[data-look="day-line"] .ops-fold,
+html[data-look="day-line"] .ops-step::before,
+html[data-look="day-line"] .tl-bar { border-radius: 0; }
+html[data-look="day-line"] .ops-tab[aria-selected="true"],
+html[data-look="day-line"] .ops-tab[aria-pressed="true"] { box-shadow: none; border-bottom: 2px solid var(--fg-strong); }
+
+/* State: a word and a shape, never colour alone */
+html[data-look="day-line"] .chip,
+html[data-look="day-line"] .ops-chip,
+html[data-look="day-line"] .tl-pill { border-radius: 0; background: transparent; border-color: currentColor; font-weight: 400; }
+html[data-look="day-line"] .chip.alert,
+html[data-look="day-line"] .chip.attn { font-weight: 600; }
+html[data-look="day-line"] .chip.ok::before { content: "\25CF"; }
+html[data-look="day-line"] .chip.attn::before,
+html[data-look="day-line"] .chip.alert::before { content: "\25C6"; }
+html[data-look="day-line"] .chip.info::before { content: "\25CB"; }
+html[data-look="day-line"] .st i,
+html[data-look="day-line"] .live::before,
+html[data-look="day-line"] .live-dot { border-radius: 0; }
+
+/* The Overview, as the renderer draws it: an opening sentence, then the line.
+   Five columns: gutter bars | clock time | axis marker | text | side note. */
+html[data-look="day-line"] .look-mount { margin: 0 0 var(--row-gap); }
+html[data-look="day-line"] .dl-sheet { padding-top: 6px; }
+html[data-look="day-line"] .dl-open { margin: 14px 0 22px; font: 400 var(--dl-open)/1.3 var(--font-body); color: var(--fg-strong); letter-spacing: -.005em; max-width: 36em; }
+html[data-look="day-line"] .dl-line { list-style: none; margin: 0; padding: 0; }
+html[data-look="day-line"] .dl-row { display: grid; grid-template-columns: 30px var(--dl-time) 22px minmax(0, 1fr) minmax(0, 14rem); column-gap: 8px; align-items: stretch; margin: 0; padding: 0; font-size: var(--base); line-height: 1.4; color: var(--fg); }
+html[data-look="day-line"] .dl-row > span { padding: var(--dl-pad) 0; }
+html[data-look="day-line"] .dl-row > .dl-gutter,
+html[data-look="day-line"] .dl-row > .dl-mark { padding: 0; }
+
+/* gutter: three lanes, each a bar that runs through the rows it covers */
+html[data-look="day-line"] .dl-gutter { display: flex; gap: 3px; align-items: stretch; }
+html[data-look="day-line"] .dl-bar { display: block; width: 6px; flex: none; }
+html[data-look="day-line"] .dl-bar-down { background: var(--fg-strong); }
+html[data-look="day-line"] .dl-bar-degraded { background: repeating-linear-gradient(to bottom, var(--fg-strong) 0 7px, transparent 7px 11px); }
+html[data-look="day-line"] .dl-bar-overdue { background: repeating-linear-gradient(to bottom, var(--fg-strong) 0 2px, transparent 2px 5px); }
+html[data-look="day-line"] .dl-bar.dl-last { border-bottom: 2px solid var(--fg-strong); }
+
+/* clock time: mono; the side note is the only right-aligned part */
+html[data-look="day-line"] .dl-time { font: 400 12.5px/1.6 var(--font-mono); color: var(--fg-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+html[data-look="day-line"] .dl-need .dl-time,
+html[data-look="day-line"] .dl-down .dl-time { color: var(--fg-strong); font-weight: 500; }
+html[data-look="day-line"] .dl-text { min-width: 0; overflow-wrap: anywhere; }
+html[data-look="day-line"] .dl-side { text-align: right; color: var(--fg-dim); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+html[data-look="day-line"] .dl-title { color: var(--fg-strong); text-decoration: none; }
+html[data-look="day-line"] .dl-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+html[data-look="day-line"] .dl-strong,
+html[data-look="day-line"] .dl-strong .dl-title { font-weight: 600; }
+html[data-look="day-line"] .dl-act { margin-left: 14px; font: 400 13px/1.2 var(--font-body); padding: 0; border: 0; border-bottom: 1px solid var(--fg-strong); background: transparent; color: var(--fg-strong); border-radius: 0; cursor: pointer; }
+html[data-look="day-line"] .dl-act:hover { background: var(--fg-strong); color: var(--bg); }
+
+/* the axis: one vertical line through the marker column, with a drawn shape at each row */
+html[data-look="day-line"] .dl-mark { position: relative; display: block; }
+html[data-look="day-line"] .dl-mark::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; margin-left: -.5px; background: var(--fg-dim); }
+html[data-look="day-line"] .dl-shape { position: absolute; left: 50%; top: calc(var(--dl-pad) + .3em); width: 11px; height: 11px; margin-left: -5.5px; box-sizing: border-box; background: var(--bg); border: 2px solid var(--fg-strong); }
+html[data-look="day-line"] .dl-m-event { border-radius: 50%; }
+html[data-look="day-line"] .dl-m-done { border-radius: 50%; background: var(--fg-strong); }
+html[data-look="day-line"] .dl-m-need { background: var(--fg-strong); border-radius: 0; }
+html[data-look="day-line"] .dl-m-down { background: var(--fg-strong); border-radius: 0; transform: rotate(45deg); }
+html[data-look="day-line"] .dl-m-flight { border-radius: 50%; background: radial-gradient(circle, var(--fg-strong) 0 2px, var(--bg) 2.5px); }
+html[data-look="day-line"] .dl-m-plan { border-radius: 50%; border-style: dashed; border-width: 1.5px; }
+
+/* day headings and the empty rows: words only (the axis keeps running through them) */
+html[data-look="day-line"] .dl-day .dl-text { font-weight: 600; color: var(--fg-strong); padding-top: 14px; }
+html[data-look="day-line"] .dl-empty .dl-text { color: var(--fg-dim); }
+
+/* the "now" line: a rule across the page with a tag in the time column */
+html[data-look="day-line"] .dl-now { border-top: 2px solid var(--fg-strong); margin-top: 6px; }
+html[data-look="day-line"] .dl-now > .dl-time { padding-top: 5px; }
+html[data-look="day-line"] .dl-nowtag { display: inline-block; padding: 0 7px; background: var(--accent); color: var(--accent-ink); font: 500 12.5px/1.6 var(--font-mono); }
+html[data-look="day-line"] .dl-now .dl-text { color: var(--fg-dim); padding-top: 5px; }
+html[data-look="day-line"] .dl-now .dl-mark::before { background: var(--fg-strong); }
+
+/* Narrow windows: back to the shell's bottom bar; the side note drops under the text */
+@media (max-width: 860px) {
+  html[data-look="day-line"] { --dl-time: 4.5rem; }
+  html[data-look="day-line"] .app { display: grid; }
+  html[data-look="day-line"] .side { position: fixed; inset: auto 0 0 0; z-index: 20; flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; gap: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--fg-strong); border-bottom: 0; background: var(--bg); }
+  html[data-look="day-line"] .nav { flex-wrap: nowrap; gap: 0; width: 100%; justify-content: space-around; }
+  html[data-look="day-line"] .nav a,
+  html[data-look="day-line"][data-sidebar="icons"] .nav a { flex-direction: column; justify-content: center; gap: 2px; padding: 6px 8px; min-width: 56px; font-size: 11px; font-weight: 400; }
+  html[data-look="day-line"] .nav a > svg { display: inline-block; }
+  html[data-look="day-line"] .nav a[aria-current="page"] { text-decoration: none; font-weight: 600; }
+  html[data-look="day-line"] .top,
+  html[data-look="day-line"] .content { padding-inline: 16px; }
+  html[data-look="day-line"] .content { padding-bottom: 96px; }
+  html[data-look="day-line"] .dl-row { grid-template-columns: 24px var(--dl-time) 18px minmax(0, 1fr); column-gap: 6px; }
+  html[data-look="day-line"] .dl-side { grid-column: 4; text-align: left; padding-top: 0; margin-top: -4px; }
+  html[data-look="day-line"] .dl-side:empty { display: none; }
+  html[data-look="day-line"] .dl-bar { width: 5px; }
+}
+
+/* Keyboard focus */
+html[data-look="day-line"] :focus-visible { outline: 3px solid var(--fg-strong); outline-offset: 2px; }

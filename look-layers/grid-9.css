@@ -1,0 +1,167 @@
+/* Look L "Grid 9": a strict nine-column modular grid. One typeface, flush left, hairline rules, no boxes, no icons, no shadows.
+   Weight carries state (bold = needs attention); words carry state ("Down", "Check", "Up"); colour is not used for state.
+   The Overview is drawn by look-layers/grid-9.js (ruled bands on the grid) while html[data-look-drawn="overview"] is set; every
+   other page keeps its own markup, restyled here (flat, ruled, square, one typeface). The menu becomes one line along the top:
+   the Sidebar setting is retired for this look (the control stays and is harmless: "icons only" still shows words).
+   Not in this layer: the Ops board as a table (the page keeps its own tiles, restyled), and the "show the grid" switch.
+   Every rule is scoped to html[data-look="grid-9"]; every colour is a theme variable. */
+
+/* contrast: --fg on --bg; --fg-strong on --bg; --fg-dim on --bg; --fg on --panel; --fg-strong on --panel; --fg-dim on --panel; --accent-ink on --accent */
+
+html[data-look="grid-9"] {
+  --font-display: var(--font-body);
+  --lift: none;
+  --base: 15px;
+  --g9-open: clamp(34px, 6.4vw, 68px);
+}
+html[data-look="grid-9"][data-density="compact"] { --base: 14px; --g9-open: clamp(28px, 5vw, 52px); }
+
+/* One-line menu along the top, a 6 px rule above */
+html[data-look="grid-9"] .app { display: block; }
+html[data-look="grid-9"] .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 14px clamp(16px, 4vw, 40px) 10px; margin: 0; border-right: 0; border-top: 6px solid var(--fg-strong); border-bottom: 1px solid var(--fg-strong); background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="grid-9"] .brand { padding: 0; gap: 0; }
+html[data-look="grid-9"] .brand-mark { display: none; }
+html[data-look="grid-9"] .brand-name { font: 700 15px/1.2 var(--font-body); color: var(--fg-strong); letter-spacing: 0; }
+html[data-look="grid-9"] .nav { flex: 1 1 auto; flex-direction: row; flex-wrap: wrap; gap: 2px 18px; align-items: baseline; }
+html[data-look="grid-9"] .nav-group { display: none; }
+html[data-look="grid-9"] .nav a { gap: 0; padding: 2px 0; border-radius: 0; font-size: 15px; font-weight: 400; background: transparent; box-shadow: none; }
+html[data-look="grid-9"] .nav a > svg { display: none; }
+html[data-look="grid-9"] .nav a:hover { background: transparent; text-decoration: underline; text-underline-offset: 4px; }
+html[data-look="grid-9"] .nav a[aria-current="page"] { background: transparent; color: var(--fg-strong); box-shadow: none; font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+html[data-look="grid-9"] .nav .badge { margin-left: 6px; position: static; border-radius: 0; }
+html[data-look="grid-9"] .side-foot { margin-top: 0; flex-direction: row; align-items: baseline; gap: 14px; }
+html[data-look="grid-9"] .auth-status { padding: 0; }
+/* the Sidebar "icons only" setting is retired here: the words stay */
+html[data-look="grid-9"][data-sidebar="icons"] .lbl { display: inline; }
+html[data-look="grid-9"][data-sidebar="icons"] .brand-name,
+html[data-look="grid-9"][data-sidebar="icons"] .auth-status { display: inline; }
+html[data-look="grid-9"][data-sidebar="icons"] .side { padding-inline: clamp(16px, 4vw, 40px); align-items: baseline; }
+html[data-look="grid-9"][data-sidebar="icons"] .nav a { justify-content: flex-start; }
+
+/* Top bar, buttons, inputs: square, plain */
+html[data-look="grid-9"] .top { padding: 8px clamp(16px, 4vw, 40px); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-look="grid-9"] .icon-btn { border-radius: 0; background: transparent; }
+html[data-look="grid-9"] .search input { border-radius: 0; }
+html[data-look="grid-9"] .btn,
+html[data-look="grid-9"] .ops-btn { border-radius: 0; font-weight: 400; }
+html[data-look="grid-9"] input,
+html[data-look="grid-9"] select,
+html[data-look="grid-9"] textarea { border-radius: 0; }
+
+/* The page: a sheet on the grid. The page colour sits behind the content so a background shows only in the margins. */
+html[data-look="grid-9"] .content { max-width: 1200px; margin-inline: auto; padding: 8px clamp(16px, 4vw, 40px) 64px; background: var(--bg); }
+html[data-look="grid-9"] .page-head { margin: 18px 0 18px; padding-bottom: 8px; border-bottom: 1px solid var(--fg-strong); }
+html[data-look="grid-9"] .page-head h1 { font: 700 clamp(30px, 5vw, 53px)/1.05 var(--font-body); letter-spacing: -.01em; }
+html[data-look="grid-9"] .widgets { display: block; }
+html[data-look="grid-9"] .w { margin: 0 0 var(--row-gap); }
+html[data-look="grid-9"] .w:not(.lift) { border-top: 1px solid var(--fg-strong); padding-top: 12px; }
+html[data-look="grid-9"] .lift { background: transparent; border: 0; border-top: 1px solid var(--fg-strong); border-radius: 0; box-shadow: none; padding-top: 12px; }
+html[data-look="grid-9"] .need { padding: 0; }
+html[data-look="grid-9"] .need li { padding: var(--need-pad) 0; border-top: 1px solid var(--line); }
+html[data-look="grid-9"] .need li:first-child { border-top: 0; }
+html[data-look="grid-9"] .need b { font-weight: 700; }
+html[data-look="grid-9"] .need-head h2,
+html[data-look="grid-9"] .sec-head h2,
+html[data-look="grid-9"] .st-head h2 { font: 700 15px/1.2 var(--font-body); letter-spacing: 0; }
+html[data-look="grid-9"] .spine { padding-left: 0; }
+html[data-look="grid-9"] .spine::before { display: none; }
+html[data-look="grid-9"] .spine li { padding: 8px 0; border-top: 1px solid var(--line); }
+html[data-look="grid-9"] .spine li::before { display: none; }
+
+/* The Overview's default opening and blocks give way to the grid while the renderer has drawn */
+html[data-look="grid-9"][data-look-drawn="overview"] .hero,
+html[data-look="grid-9"][data-look-drawn="overview"] .widgets [data-w="need"],
+html[data-look="grid-9"][data-look-drawn="overview"] .widgets [data-w="feed"],
+html[data-look="grid-9"][data-look-drawn="overview"] .widgets [data-w="flight"] { display: none; }
+
+/* Other blocks: ruled, square, no shadow */
+html[data-look="grid-9"] .box,
+html[data-look="grid-9"] .ops-tile,
+html[data-look="grid-9"] .ops-list,
+html[data-look="grid-9"] .ops-panel,
+html[data-look="grid-9"] .ops-gate,
+html[data-look="grid-9"] .ops-onboard,
+html[data-look="grid-9"] .ops-setup,
+html[data-look="grid-9"] .ops-needs,
+html[data-look="grid-9"] .ops-pc-card,
+html[data-look="grid-9"] .ops-pc-file,
+html[data-look="grid-9"] .ops-code,
+html[data-look="grid-9"] .ops-run-box,
+html[data-look="grid-9"] .ops-conn,
+html[data-look="grid-9"] .ops-notice,
+html[data-look="grid-9"] .ops-banner,
+html[data-look="grid-9"] .ops-reveal,
+html[data-look="grid-9"] .ops-toast,
+html[data-look="grid-9"] .tl-stat,
+html[data-look="grid-9"] .tl-approval,
+html[data-look="grid-9"] .tk-rows,
+html[data-look="grid-9"] .tk-totals,
+html[data-look="grid-9"] .tk-msg,
+html[data-look="grid-9"] .tk-accept { border-radius: 0; box-shadow: none; }
+html[data-look="grid-9"] .ops-tabs,
+html[data-look="grid-9"] .ops-tab,
+html[data-look="grid-9"] .ops-filter,
+html[data-look="grid-9"] .ops-fold,
+html[data-look="grid-9"] .ops-step::before,
+html[data-look="grid-9"] .tl-bar { border-radius: 0; }
+html[data-look="grid-9"] .ops-tab[aria-selected="true"],
+html[data-look="grid-9"] .ops-tab[aria-pressed="true"] { box-shadow: none; border-bottom: 2px solid var(--fg-strong); }
+
+/* State: a word and a shape, never colour alone */
+html[data-look="grid-9"] .chip,
+html[data-look="grid-9"] .ops-chip,
+html[data-look="grid-9"] .tl-pill { border-radius: 0; background: transparent; border-color: currentColor; font-weight: 400; }
+html[data-look="grid-9"] .chip.alert,
+html[data-look="grid-9"] .chip.attn { font-weight: 700; }
+html[data-look="grid-9"] .chip.ok::before { content: "\25A0"; }
+html[data-look="grid-9"] .chip.attn::before { content: "\25C6"; }
+html[data-look="grid-9"] .chip.alert::before { content: "\25B2"; }
+html[data-look="grid-9"] .chip.info::before { content: "\25CF"; }
+html[data-look="grid-9"] .st i,
+html[data-look="grid-9"] .live::before,
+html[data-look="grid-9"] .live-dot { border-radius: 0; }
+
+/* The Overview, as the renderer draws it: three display lines, then ruled bands. Nine columns, 20 px gutters. */
+html[data-look="grid-9"] .look-mount { margin: 0 0 var(--row-gap); }
+html[data-look="grid-9"] .g9-open { margin: 18px 0 26px; padding-bottom: 14px; border-bottom: 1px solid var(--fg-strong); }
+html[data-look="grid-9"] .g9-line { margin: 0; font: 400 var(--g9-open)/1.04 var(--font-body); letter-spacing: -.02em; color: var(--fg); font-variant-numeric: tabular-nums; }
+html[data-look="grid-9"] .g9-line.g9-strong { font-weight: 700; color: var(--fg-strong); }
+html[data-look="grid-9"] .g9-band { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); column-gap: 20px; border-top: 1px solid var(--fg-strong); padding: 12px 0 18px; }
+html[data-look="grid-9"] .g9-head { grid-column: 1 / span 2; margin: 0; font: 700 15px/1.3 var(--font-body); color: var(--fg-strong); }
+html[data-look="grid-9"] .g9-rows { grid-column: 3 / -1; }
+html[data-look="grid-9"] .g9-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); column-gap: 20px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--line); font-size: var(--base); line-height: 1.4; }
+html[data-look="grid-9"] .g9-row:first-child { border-top: 0; padding-top: 0; }
+html[data-look="grid-9"] .g9-c1 { grid-column: 1; color: var(--fg-dim); }
+html[data-look="grid-9"] .g9-c2 { grid-column: 2 / span 4; color: var(--fg); }
+html[data-look="grid-9"] .g9-c6 { grid-column: 6 / span 2; color: var(--fg-dim); }
+html[data-look="grid-9"] .g9-c8 { grid-column: 7; justify-self: end; }
+html[data-look="grid-9"] .g9-num { font-variant-numeric: tabular-nums; }
+html[data-look="grid-9"] .g9-strong { font-weight: 700; color: var(--fg-strong); }
+html[data-look="grid-9"] .g9-title { color: var(--fg-strong); font-weight: 400; text-decoration: none; }
+html[data-look="grid-9"] .g9-need .g9-title { font-weight: 700; }
+html[data-look="grid-9"] .g9-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+html[data-look="grid-9"] .g9-act { font: 400 var(--base)/1.2 var(--font-body); padding: 0; border: 0; border-bottom: 1px solid var(--fg-strong); background: transparent; color: var(--fg-strong); border-radius: 0; cursor: pointer; }
+html[data-look="grid-9"] .g9-act:hover { background: var(--fg-strong); color: var(--bg); }
+html[data-look="grid-9"] .g9-empty { margin: 0; color: var(--fg-dim); grid-column: 1 / -1; }
+
+/* Narrow windows: one column, and back to the shell's bottom bar */
+@media (max-width: 860px) {
+  html[data-look="grid-9"] .app { display: grid; }
+  html[data-look="grid-9"] .side { position: fixed; inset: auto 0 0 0; z-index: 20; flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; gap: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--fg-strong); border-bottom: 0; background: var(--bg); }
+  html[data-look="grid-9"] .nav { flex-wrap: nowrap; gap: 0; width: 100%; justify-content: space-around; }
+  html[data-look="grid-9"] .nav a,
+  html[data-look="grid-9"][data-sidebar="icons"] .nav a { flex-direction: column; justify-content: center; gap: 2px; padding: 6px 8px; min-width: 56px; font-size: 11px; font-weight: 400; }
+  html[data-look="grid-9"] .nav a > svg { display: inline-block; }
+  html[data-look="grid-9"] .nav a[aria-current="page"] { text-decoration: none; font-weight: 700; }
+  html[data-look="grid-9"] .top,
+  html[data-look="grid-9"] .content { padding-inline: 16px; }
+  html[data-look="grid-9"] .content { padding-bottom: 96px; }
+  html[data-look="grid-9"] .g9-band { display: block; }
+  html[data-look="grid-9"] .g9-head { margin-bottom: 6px; }
+  html[data-look="grid-9"] .g9-row { display: block; }
+  html[data-look="grid-9"] .g9-row .g9-cell { display: block; }
+  html[data-look="grid-9"] .g9-c8 { justify-self: start; }
+}
+
+/* Keyboard focus */
+html[data-look="grid-9"] :focus-visible { outline: 3px solid var(--fg-strong); outline-offset: 2px; }
