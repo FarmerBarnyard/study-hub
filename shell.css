@@ -193,7 +193,9 @@ a.sub { text-decoration: none; } a.sub:hover { color: var(--fg-strong); text-dec
 .live.is-offline { color: var(--alert); }
 .live.is-offline::before { animation: none; }
 @keyframes pulse { 50% { opacity: .3; } }
-.toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); padding: 10px 16px; border-radius: 10px; background: var(--fg-strong); color: var(--bg); font-weight: 500; z-index: 60; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100vw - 32px); }
+/* Bottom-left, small and click-through: a passing note ("Look: Poster") must never sit over the page or the open
+   Settings panel (right edge). On a phone it rides above the bottom navigation bar. */
+.toast { position: fixed; left: 16px; bottom: 16px; padding: 8px 14px; font-size: 14px; border-radius: 10px; background: var(--fg-strong); color: var(--bg); font-weight: 500; z-index: 60; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: min(360px, calc(100vw - 32px)); overflow-wrap: anywhere; }
 .toast.show { opacity: 1; }
 /* The API cannot be reached (shell.js, "API fallback"): old data is on screen and changes are paused. */
 .api-banner { position: fixed; inset-inline: 16px; bottom: 72px; margin-inline: auto; width: max-content; max-width: min(720px, calc(100vw - 32px)); display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 10px; background: var(--panel); color: var(--fg-strong); border: 1px solid var(--alert); box-shadow: 0 6px 24px rgba(0, 0, 0, .18); font-weight: 500; z-index: 59; }
@@ -433,6 +435,7 @@ fieldset fieldset { margin-top: 20px; }
   .nav .badge, :root[data-sidebar="icons"] .nav .badge { position: absolute; top: 0; right: 4px; margin: 0; }
   .top, .content { padding-inline: 16px; }
   .content { padding-bottom: 96px; }
+  .toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
   .page-head h1 { font-size: 26px; }
   .crumb { display: none; }
   .search { flex: 1; width: auto; }
